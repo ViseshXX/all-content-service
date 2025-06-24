@@ -18,11 +18,7 @@ async function bootstrap() {
 
   app.useGlobalPipes(new ValidationPipe());
   app.setGlobalPrefix('v1');
-  app.enableCors({
-    methods: ['GET', 'POST', 'HEAD', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    credentials: false
-  });
-
+  
   const config = new DocumentBuilder()
     .setTitle('ALL Content Service')
     .setDescription(
@@ -37,18 +33,18 @@ async function bootstrap() {
 
   // Cors aalowd for the specific url
   const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [];
-  app.use(
-    cors({
-      origin: (origin, callback) => {
-        if (!origin || allowedOrigins.includes(origin)) {
-          callback(null, true);
-        } else {
-          callback(new Error('Not allowed by CORS'));
-        }
-      },
-      credentials: true,
-    }),
-  );
+  app.enableCors({
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    methods: ['GET', 'POST', 'HEAD', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    credentials: true,
+  });
+
 
   // content-security-policys added
   app
