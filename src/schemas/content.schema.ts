@@ -66,6 +66,19 @@ export class content {
       correctness?: {
         '50%': [string];
       };
+      syllable?:[
+        {
+          text: string,
+          audio_url: string
+        },
+      ];
+      words?:[string];
+      imageAudioMap?:[{
+        text: string,
+        audio_url: string,
+        image_url: string,
+      }]
+
     },
   ];
 
