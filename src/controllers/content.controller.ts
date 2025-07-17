@@ -28,6 +28,7 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/auth/auth.guard';
+import en_config from 'src/config/language/en';
 
 @ApiTags('content')
 @Controller('content')
@@ -1038,6 +1039,14 @@ export class contentController {
       let contentCollection;
       let collectionId;
 
+      if(en_config.tags.some(tag => queryData.tags.some(qtag => qtag.includes(tag)))){
+        queryData.cLevel = "";
+        queryData.complexityLevel = "";
+        queryData.graphemesMappedObj = {};
+        queryData.level_competency = [];
+        queryData.tokenArr = [];
+      }
+      
       if (
         queryData.story_mode === 'true' &&
         queryData.level_competency.length > 0
