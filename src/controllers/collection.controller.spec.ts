@@ -14,9 +14,6 @@ describe('CollectionController', () => {
     send: jest.fn(),
   };
 
-  // const mockJwtAuthGuard = {
-  //   canActivate: jest.fn(() => true),
-  // };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
