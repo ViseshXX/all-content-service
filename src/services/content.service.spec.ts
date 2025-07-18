@@ -91,6 +91,36 @@ describe('contentService', () => {
     contentSourceData: [createContentSourceData(text, language, phonemes, syllableCount)],
   });
 
+  // Helper function to create mock aggregate with results
+  const createMockAggregate = (results: any[]) => jest.fn().mockImplementation(() => ({
+    exec: jest.fn().mockResolvedValue(results),
+  }));
+
+  // Helper function to setup service aggregate mock
+  const setupAggregateMock = (results: any[]) => {
+    const mockAggregate = createMockAggregate(results);
+    service['content'].aggregate = mockAggregate;
+    return mockAggregate;
+  };
+
+  // Helper function to create search test with common expectations
+  const testSearchFunction = async (
+    searchFunction: () => Promise<any>,
+    expectedResults: any[],
+    additionalExpectations?: (result: any) => void
+  ) => {
+    const mockAggregate = setupAggregateMock(expectedResults);
+    
+    const result = await searchFunction();
+    
+    expect(mockAggregate).toHaveBeenCalled();
+    expect(result).toHaveProperty('wordsArr');
+    
+    if (additionalExpectations) {
+      additionalExpectations(result);
+    }
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -159,53 +189,23 @@ describe('contentService', () => {
         createSearchResult('search-result-1', 'Word', 'apple', 'en', ['AE', 'P', 'AH', 'L'], 2),
       ];
 
-      const mockAggregate = jest.fn().mockImplementation(() => ({
-        exec: jest.fn().mockResolvedValue(mockResults),
-      }));
-
-      service['content'].aggregate = mockAggregate;
-
-      const result = await service.search(
-        ['AE'],
-        'en',
-        'Word',
-        5,
-        '',
-        'L1',
-        [],
-        {},
-        [],
-        [],
+      await testSearchFunction(
+        () => service.search(['AE'], 'en', 'Word', 5, '', 'L1', [], {}, [], []),
+        mockResults,
+        (result) => {
+          expect(result).toHaveProperty('contentForToken');
+        }
       );
-
-      expect(mockAggregate).toHaveBeenCalled();
-      expect(result).toHaveProperty('wordsArr');
-      expect(result).toHaveProperty('contentForToken');
     });
 
     it('should handle empty results gracefully', async () => {
-      const mockAggregate = jest.fn().mockImplementation(() => ({
-        exec: jest.fn().mockResolvedValue([]),
-      }));
-
-      service['content'].aggregate = mockAggregate;
-
-      const result = await service.search(
-        ['nonexistent'],
-        'ta',
-        'Word',
-        5,
-        '',
-        'L1',
-        ['C1'],
-        {},
+      await testSearchFunction(
+        () => service.search(['nonexistent'], 'ta', 'Word', 5, '', 'L1', ['C1'], {}, [], []),
         [],
-        [],
+        (result) => {
+          expect(result.wordsArr).toHaveLength(0);
+        }
       );
-
-      expect(mockAggregate).toHaveBeenCalled();
-      expect(result).toHaveProperty('wordsArr');
-      expect(result.wordsArr).toHaveLength(0);
     });
 
     it('should handle database errors properly', async () => {
@@ -240,28 +240,13 @@ describe('contentService', () => {
         },
       ];
 
-      const mockAggregate = jest.fn().mockImplementation(() => ({
-        exec: jest.fn().mockResolvedValue(mockSearchResults),
-      }));
-
-      service['content'].aggregate = mockAggregate;
-
-      const result = await service.search(
-        ['கு'],
-        'ta',
-        'Word',
-        5,
-        'family',
-        'L1',
-        ['C1'],
-        {},
-        [],
-        [],
+      await testSearchFunction(
+        () => service.search(['கு'], 'ta', 'Word', 5, 'family', 'L1', ['C1'], {}, [], []),
+        mockSearchResults,
+        (result) => {
+          expect(result).toHaveProperty('contentForToken');
+        }
       );
-
-      expect(mockAggregate).toHaveBeenCalled();
-      expect(result).toHaveProperty('wordsArr');
-      expect(result).toHaveProperty('contentForToken');
     });
 
     it('should handle search with multiple tags', async () => {
@@ -272,27 +257,10 @@ describe('contentService', () => {
         },
       ];
 
-      const mockAggregate = jest.fn().mockImplementation(() => ({
-        exec: jest.fn().mockResolvedValue(mockSearchResults),
-      }));
-
-      service['content'].aggregate = mockAggregate;
-
-      const result = await service.search(
-        ['fa'],
-        'en',
-        'Word',
-        5,
-        'family,person',
-        'L1',
-        ['C1'],
-        {},
-        [],
-        [],
+      await testSearchFunction(
+        () => service.search(['fa'], 'en', 'Word', 5, 'family,person', 'L1', ['C1'], {}, [], []),
+        mockSearchResults
       );
-
-      expect(mockAggregate).toHaveBeenCalled();
-      expect(result).toHaveProperty('wordsArr');
     });
 
     it('should handle search with CEFR levels', async () => {
@@ -305,27 +273,10 @@ describe('contentService', () => {
         },
       ];
 
-      const mockAggregate = jest.fn().mockImplementation(() => ({
-        exec: jest.fn().mockResolvedValue(mockSearchResults),
-      }));
-
-      service['content'].aggregate = mockAggregate;
-
-      const result = await service.search(
-        ['ba'],
-        'en',
-        'Word',
-        5,
-        '',
-        'L1',
-        ['C1'],
-        {},
-        [],
-        ['A1'],
+      await testSearchFunction(
+        () => service.search(['ba'], 'en', 'Word', 5, '', 'L1', ['C1'], {}, [], ['A1']),
+        mockSearchResults
       );
-
-      expect(mockAggregate).toHaveBeenCalled();
-      expect(result).toHaveProperty('wordsArr');
     });
 
     it('should handle search with level competency', async () => {
@@ -338,27 +289,10 @@ describe('contentService', () => {
         },
       ];
 
-      const mockAggregate = jest.fn().mockImplementation(() => ({
-        exec: jest.fn().mockResolvedValue(mockSearchResults),
-      }));
-
-      service['content'].aggregate = mockAggregate;
-
-      const result = await service.search(
-        ['com'],
-        'en',
-        'Word',
-        5,
-        '',
-        'L1',
-        ['C1'],
-        {},
-        ['L1.1'],
-        [],
+      await testSearchFunction(
+        () => service.search(['com'], 'en', 'Word', 5, '', 'L1', ['C1'], {}, ['L1.1'], []),
+        mockSearchResults
       );
-
-      expect(mockAggregate).toHaveBeenCalled();
-      expect(result).toHaveProperty('wordsArr');
     });
 
     it('should handle search with graphemes mapping', async () => {
@@ -366,29 +300,12 @@ describe('contentService', () => {
         createSearchResult('grapheme-content', 'Word', 'grapheme', 'en', ['G', 'R', 'AE', 'F', 'IY', 'M'], 2),
       ];
 
-      const mockAggregate = jest.fn().mockImplementation(() => ({
-        exec: jest.fn().mockResolvedValue(mockSearchResults),
-      }));
-
-      service['content'].aggregate = mockAggregate;
-
       const graphemesMappedObj = { 'gr': ['G', 'R'] };
 
-      const result = await service.search(
-        ['gr'],
-        'en',
-        'Word',
-        5,
-        '',
-        'L1',
-        ['C1'],
-        graphemesMappedObj,
-        [],
-        [],
+      await testSearchFunction(
+        () => service.search(['gr'], 'en', 'Word', 5, '', 'L1', ['C1'], graphemesMappedObj, [], []),
+        mockSearchResults
       );
-
-      expect(mockAggregate).toHaveBeenCalled();
-      expect(result).toHaveProperty('wordsArr');
     });
   });
 
@@ -412,56 +329,46 @@ describe('contentService', () => {
         },
       ];
 
-      const mockAggregate = jest.fn().mockImplementation(() => ({
-        exec: jest.fn().mockResolvedValue(mockSearchResults),
-      }));
-
-      service['content'].aggregate = mockAggregate;
-
-      const result = await service.searchByFilter(
-        ['அ', 'ம்'],
-        { $gte: 1, $lte: 3 },
-        undefined,
-        { $gte: 5, $lte: 15 },
-        { $gte: 3, $lte: 10 },
-        undefined,
-        'ta',
-        'Word',
-        5,
-        undefined,
-        undefined,
-        ['family'],
+      await testSearchFunction(
+        () => service.searchByFilter(
+          ['அ', 'ம்'],
+          { $gte: 1, $lte: 3 },
+          undefined,
+          { $gte: 5, $lte: 15 },
+          { $gte: 3, $lte: 10 },
+          undefined,
+          'ta',
+          'Word',
+          5,
+          undefined,
+          undefined,
+          ['family'],
+        ),
+        mockSearchResults,
+        (result) => {
+          expect(Array.isArray(result.wordsArr)).toBe(true);
+        }
       );
-
-      expect(mockAggregate).toHaveBeenCalled();
-      expect(result).toHaveProperty('wordsArr');
-      expect(Array.isArray(result.wordsArr)).toBe(true);
     });
 
     it('should handle empty parameters gracefully', async () => {
-      const mockAggregate = jest.fn().mockImplementation(() => ({
-        exec: jest.fn().mockResolvedValue([]),
-      }));
-
-      service['content'].aggregate = mockAggregate;
-
-      const result = await service.searchByFilter(
-        [],
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        'en',
-        'Word',
-        5,
-        undefined,
-        undefined,
-        [],
+      await testSearchFunction(
+        () => service.searchByFilter(
+          [],
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          'en',
+          'Word',
+          5,
+          undefined,
+          undefined,
+          [],
+        ),
+        []
       );
-
-      expect(mockAggregate).toHaveBeenCalled();
-      expect(result).toHaveProperty('wordsArr');
     });
 
     it('should handle char contentType conversion', async () => {
@@ -479,29 +386,23 @@ describe('contentService', () => {
         },
       ];
 
-      const mockAggregate = jest.fn().mockImplementation(() => ({
-        exec: jest.fn().mockResolvedValue(mockSearchResults),
-      }));
-
-      service['content'].aggregate = mockAggregate;
-
-      const result = await service.searchByFilter(
-        ['அ'],
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        'ta',
-        'Char',
-        5,
-        undefined,
-        undefined,
-        [],
+      await testSearchFunction(
+        () => service.searchByFilter(
+          ['அ'],
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          'ta',
+          'Char',
+          5,
+          undefined,
+          undefined,
+          [],
+        ),
+        mockSearchResults
       );
-
-      expect(mockAggregate).toHaveBeenCalled();
-      expect(result).toHaveProperty('wordsArr');
     });
 
     it('should handle sentence contentType', async () => {
@@ -519,29 +420,23 @@ describe('contentService', () => {
         },
       ];
 
-      const mockAggregate = jest.fn().mockImplementation(() => ({
-        exec: jest.fn().mockResolvedValue(mockSearchResults),
-      }));
-
-      service['content'].aggregate = mockAggregate;
-
-      const result = await service.searchByFilter(
-        ['அம்மா'],
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        'ta',
-        'Sentence',
-        5,
-        undefined,
-        undefined,
-        [],
+      await testSearchFunction(
+        () => service.searchByFilter(
+          ['அம்மா'],
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          'ta',
+          'Sentence',
+          5,
+          undefined,
+          undefined,
+          [],
+        ),
+        mockSearchResults
       );
-
-      expect(mockAggregate).toHaveBeenCalled();
-      expect(result).toHaveProperty('wordsArr');
     });
 
     it('should handle paragraph contentType', async () => {
@@ -559,29 +454,23 @@ describe('contentService', () => {
         },
       ];
 
-      const mockAggregate = jest.fn().mockImplementation(() => ({
-        exec: jest.fn().mockResolvedValue(mockSearchResults),
-      }));
-
-      service['content'].aggregate = mockAggregate;
-
-      const result = await service.searchByFilter(
-        ['இது'],
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        'ta',
-        'Paragraph',
-        5,
-        undefined,
-        undefined,
-        [],
+      await testSearchFunction(
+        () => service.searchByFilter(
+          ['இது'],
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          'ta',
+          'Paragraph',
+          5,
+          undefined,
+          undefined,
+          [],
+        ),
+        mockSearchResults
       );
-
-      expect(mockAggregate).toHaveBeenCalled();
-      expect(result).toHaveProperty('wordsArr');
     });
 
     it('should handle contentId filter', async () => {
@@ -599,29 +488,23 @@ describe('contentService', () => {
         },
       ];
 
-      const mockAggregate = jest.fn().mockImplementation(() => ({
-        exec: jest.fn().mockResolvedValue(mockSearchResults),
-      }));
-
-      service['content'].aggregate = mockAggregate;
-
-      const result = await service.searchByFilter(
-        [],
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        'en',
-        'Word',
-        5,
-        'specific-content-id',
-        undefined,
-        [],
+      await testSearchFunction(
+        () => service.searchByFilter(
+          [],
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          'en',
+          'Word',
+          5,
+          'specific-content-id',
+          undefined,
+          [],
+        ),
+        mockSearchResults
       );
-
-      expect(mockAggregate).toHaveBeenCalled();
-      expect(result).toHaveProperty('wordsArr');
     });
 
     it('should handle collectionId filter', async () => {
@@ -640,33 +523,43 @@ describe('contentService', () => {
         },
       ];
 
-      const mockAggregate = jest.fn().mockImplementation(() => ({
-        exec: jest.fn().mockResolvedValue(mockSearchResults),
-      }));
-
-      service['content'].aggregate = mockAggregate;
-
-      const result = await service.searchByFilter(
-        [],
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        'en',
-        'Word',
-        5,
-        undefined,
-        'specific-collection',
-        [],
+      await testSearchFunction(
+        () => service.searchByFilter(
+          [],
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          'en',
+          'Word',
+          5,
+          undefined,
+          'specific-collection',
+          [],
+        ),
+        mockSearchResults
       );
-
-      expect(mockAggregate).toHaveBeenCalled();
-      expect(result).toHaveProperty('wordsArr');
     });
   });
 
   describe('charNotPresent', () => {
+    // Helper function for charNotPresent tests
+    const testCharNotPresent = async (chars: string[], mockResults: any[]) => {
+      const mockFind = jest.fn().mockReturnValue({
+        limit: jest.fn().mockReturnValue({
+          exec: jest.fn().mockResolvedValue(mockResults),
+        }),
+      });
+
+      service['content'].find = mockFind;
+
+      const result = await service.charNotPresent(chars);
+
+      expect(mockFind).toHaveBeenCalled();
+      expect(Array.isArray(result)).toBe(true);
+    };
+
     it('should return content not having specified characters', async () => {
       const mockResults = [
         {
@@ -681,18 +574,7 @@ describe('contentService', () => {
         },
       ];
 
-      const mockFind = jest.fn().mockReturnValue({
-        limit: jest.fn().mockReturnValue({
-          exec: jest.fn().mockResolvedValue(mockResults),
-        }),
-      });
-
-      service['content'].find = mockFind;
-
-      const result = await service.charNotPresent(['க', 'ங']);
-
-      expect(mockFind).toHaveBeenCalled();
-      expect(Array.isArray(result)).toBe(true);
+      await testCharNotPresent(['க', 'ங'], mockResults);
     });
 
     it('should handle Hindi vowel combinations', async () => {
@@ -709,18 +591,7 @@ describe('contentService', () => {
         },
       ];
 
-      const mockFind = jest.fn().mockReturnValue({
-        limit: jest.fn().mockReturnValue({
-          exec: jest.fn().mockResolvedValue(mockResults),
-        }),
-      });
-
-      service['content'].find = mockFind;
-
-      const result = await service.charNotPresent(['अ', 'आ']);
-
-      expect(mockFind).toHaveBeenCalled();
-      expect(Array.isArray(result)).toBe(true);
+      await testCharNotPresent(['अ', 'आ'], mockResults);
     });
 
     it('should handle database errors', async () => {
@@ -752,18 +623,7 @@ describe('contentService', () => {
         },
       ];
 
-      const mockFind = jest.fn().mockReturnValue({
-        limit: jest.fn().mockReturnValue({
-          exec: jest.fn().mockResolvedValue(mockResults),
-        }),
-      });
-
-      service['content'].find = mockFind;
-
-      const result = await service.charNotPresent(['श', 'ष']);
-
-      expect(mockFind).toHaveBeenCalled();
-      expect(Array.isArray(result)).toBe(true);
+      await testCharNotPresent(['श', 'ष'], mockResults);
     });
 
     it('should handle Tamil character combinations', async () => {
@@ -780,18 +640,7 @@ describe('contentService', () => {
         },
       ];
 
-      const mockFind = jest.fn().mockReturnValue({
-        limit: jest.fn().mockReturnValue({
-          exec: jest.fn().mockResolvedValue(mockResults),
-        }),
-      });
-
-      service['content'].find = mockFind;
-
-      const result = await service.charNotPresent(['த', 'ம']);
-
-      expect(mockFind).toHaveBeenCalled();
-      expect(Array.isArray(result)).toBe(true);
+      await testCharNotPresent(['த', 'ம'], mockResults);
     });
 
     it('should handle Kannada character combinations', async () => {
@@ -808,18 +657,7 @@ describe('contentService', () => {
         },
       ];
 
-      const mockFind = jest.fn().mockReturnValue({
-        limit: jest.fn().mockReturnValue({
-          exec: jest.fn().mockResolvedValue(mockResults),
-        }),
-      });
-
-      service['content'].find = mockFind;
-
-      const result = await service.charNotPresent(['ಕ', 'ನ']);
-
-      expect(mockFind).toHaveBeenCalled();
-      expect(Array.isArray(result)).toBe(true);
+      await testCharNotPresent(['ಕ', 'ನ'], mockResults);
     });
 
     it('should handle Telugu character combinations', async () => {
@@ -836,22 +674,39 @@ describe('contentService', () => {
         },
       ];
 
-      const mockFind = jest.fn().mockReturnValue({
-        limit: jest.fn().mockReturnValue({
-          exec: jest.fn().mockResolvedValue(mockResults),
-        }),
-      });
-
-      service['content'].find = mockFind;
-
-      const result = await service.charNotPresent(['త', 'ల']);
-
-      expect(mockFind).toHaveBeenCalled();
-      expect(Array.isArray(result)).toBe(true);
+      await testCharNotPresent(['త', 'ల'], mockResults);
     });
   });
 
   describe('getMechanicsContentData', () => {
+    // Helper function for mechanics content tests
+    const testMechanicsContent = async (
+      contentType: string,
+      mechanicsId: string,
+      limit: number,
+      language: string,
+      levelCompetencyArr: string[],
+      tagsArr: string[],
+      cefrLevelArr: string[],
+      mockResults: any[]
+    ) => {
+      const mockAggregate = jest.fn().mockResolvedValue(mockResults);
+      service['content'].aggregate = mockAggregate;
+
+      const result = await service.getMechanicsContentData(
+        contentType,
+        mechanicsId,
+        limit,
+        language,
+        levelCompetencyArr,
+        tagsArr,
+        cefrLevelArr,
+      );
+
+      expect(result).toHaveProperty('wordsArr');
+      expect(Array.isArray(result.wordsArr)).toBe(true);
+    };
+
     it('should get mechanics content data successfully', async () => {
       const mockResults = [
         {
@@ -867,21 +722,7 @@ describe('contentService', () => {
         },
       ];
 
-      const mockAggregate = jest.fn().mockResolvedValue(mockResults);
-      service['content'].aggregate = mockAggregate;
-
-      const result = await service.getMechanicsContentData(
-        'Word',
-        'mech_001',
-        5,
-        'en',
-        ['L1.1'],
-        [],
-        [],
-      );
-
-      expect(result).toHaveProperty('wordsArr');
-      expect(Array.isArray(result.wordsArr)).toBe(true);
+      await testMechanicsContent('Word', 'mech_001', 5, 'en', ['L1.1'], [], [], mockResults);
     });
 
     it('should handle database errors', async () => {
@@ -914,21 +755,7 @@ describe('contentService', () => {
         },
       ];
 
-      const mockAggregate = jest.fn().mockResolvedValue(mockResults);
-      service['content'].aggregate = mockAggregate;
-
-      const result = await service.getMechanicsContentData(
-        'Word',
-        'mech_001',
-        5,
-        'en',
-        ['L1.1'],
-        [],
-        [],
-      );
-
-      expect(result).toHaveProperty('wordsArr');
-      expect(Array.isArray(result.wordsArr)).toBe(true);
+      await testMechanicsContent('Word', 'mech_001', 5, 'en', ['L1.1'], [], [], mockResults);
     });
 
     it('should handle fallback content fetching when insufficient results', async () => {
@@ -1081,21 +908,7 @@ describe('contentService', () => {
         },
       ];
 
-      const mockAggregate = jest.fn().mockResolvedValue(mockResults);
-      service['content'].aggregate = mockAggregate;
-
-      const result = await service.getMechanicsContentData(
-        'Sentence',
-        'mech_001',
-        5,
-        'en',
-        ['L1.1'],
-        [],
-        [],
-      );
-
-      expect(result).toHaveProperty('wordsArr');
-      expect(Array.isArray(result.wordsArr)).toBe(true);
+      await testMechanicsContent('Sentence', 'mech_001', 5, 'en', ['L1.1'], [], [], mockResults);
     });
 
     it('should handle different languages', async () => {
@@ -1110,21 +923,7 @@ describe('contentService', () => {
         },
       ];
 
-      const mockAggregate = jest.fn().mockResolvedValue(mockResults);
-      service['content'].aggregate = mockAggregate;
-
-      const result = await service.getMechanicsContentData(
-        'Word',
-        'mech_001',
-        5,
-        'ta',
-        ['L1.1'],
-        [],
-        [],
-      );
-
-      expect(result).toHaveProperty('wordsArr');
-      expect(Array.isArray(result.wordsArr)).toBe(true);
+      await testMechanicsContent('Word', 'mech_001', 5, 'ta', ['L1.1'], [], [], mockResults);
     });
 
     it('should handle CEFR levels', async () => {
@@ -1142,25 +941,26 @@ describe('contentService', () => {
         },
       ];
 
-      const mockAggregate = jest.fn().mockResolvedValue(mockResults);
-      service['content'].aggregate = mockAggregate;
-
-      const result = await service.getMechanicsContentData(
-        'Word',
-        'mech_001',
-        5,
-        'en',
-        ['L1.1'],
-        [],
-        ['A1'],
-      );
-
-      expect(result).toHaveProperty('wordsArr');
-      expect(Array.isArray(result.wordsArr)).toBe(true);
+      await testMechanicsContent('Word', 'mech_001', 5, 'en', ['L1.1'], [], ['A1'], mockResults);
     });
   });
 
   describe('pagination', () => {
+    // Helper function for pagination tests
+    const testPagination = async (skip: number, limit: number, contentType: string, collectionId: string, mockResults: any[]) => {
+      const mockAggregate = jest.fn().mockImplementation(() => ({
+        exec: jest.fn().mockResolvedValue(mockResults),
+      }));
+      service['content'].aggregate = mockAggregate;
+
+      const result = await service.pagination(skip, limit, contentType, collectionId);
+
+      expect(mockAggregate).toHaveBeenCalled();
+      expect(result).toHaveProperty('data');
+      expect(result).toHaveProperty('status');
+      expect(result.status).toBe(200);
+    };
+
     it('should return paginated content', async () => {
       const mockResults = [
         {
@@ -1179,17 +979,7 @@ describe('contentService', () => {
         },
       ];
 
-      const mockAggregate = jest.fn().mockImplementation(() => ({
-        exec: jest.fn().mockResolvedValue(mockResults),
-      }));
-      service['content'].aggregate = mockAggregate;
-
-      const result = await service.pagination(0, 5, 'Word', 'collection123');
-
-      expect(mockAggregate).toHaveBeenCalled();
-      expect(result).toHaveProperty('data');
-      expect(result).toHaveProperty('status');
-      expect(result.status).toBe(200);
+      await testPagination(0, 5, 'Word', 'collection123', mockResults);
     });
 
     it('should handle empty results', async () => {
@@ -1220,20 +1010,24 @@ describe('contentService', () => {
         },
       ];
 
-      const mockAggregate = jest.fn().mockImplementation(() => ({
-        exec: jest.fn().mockResolvedValue(mockResults),
-      }));
-      service['content'].aggregate = mockAggregate;
-
-      const result = await service.pagination(0, 5, 'Sentence', 'collection123');
-
-      expect(mockAggregate).toHaveBeenCalled();
-      expect(result).toHaveProperty('data');
-      expect(result.status).toBe(200);
+      await testPagination(0, 5, 'Sentence', 'collection123', mockResults);
     });
   });
 
   describe('getRandomContent', () => {
+    // Helper function for random content tests
+    const testRandomContent = async (limit: number, contentType: string, language: string, mockResults: any[]) => {
+      const mockAggregate = jest.fn().mockResolvedValue(mockResults);
+      service['content'].aggregate = mockAggregate;
+
+      const result = await service.getRandomContent(limit, contentType, language);
+
+      expect(mockAggregate).toHaveBeenCalled();
+      expect(result).toHaveProperty('data');
+      expect(result).toHaveProperty('status');
+      expect(result.status).toBe(200);
+    };
+
     it('should return random content', async () => {
       const mockResults = [
         {
@@ -1248,15 +1042,7 @@ describe('contentService', () => {
         },
       ];
 
-      const mockAggregate = jest.fn().mockResolvedValue(mockResults);
-      service['content'].aggregate = mockAggregate;
-
-      const result = await service.getRandomContent(5, 'Word', 'ta');
-
-      expect(mockAggregate).toHaveBeenCalled();
-      expect(result).toHaveProperty('data');
-      expect(result).toHaveProperty('status');
-      expect(result.status).toBe(200);
+      await testRandomContent(5, 'Word', 'ta', mockResults);
     });
 
     it('should handle different content types', async () => {
@@ -1273,18 +1059,24 @@ describe('contentService', () => {
         },
       ];
 
-      const mockAggregate = jest.fn().mockResolvedValue(mockResults);
-      service['content'].aggregate = mockAggregate;
-
-      const result = await service.getRandomContent(5, 'Sentence', 'ta');
-
-      expect(mockAggregate).toHaveBeenCalled();
-      expect(result).toHaveProperty('data');
-      expect(result.status).toBe(200);
+      await testRandomContent(5, 'Sentence', 'ta', mockResults);
     });
   });
 
   describe('getContentWord', () => {
+    // Helper function for content word tests
+    const testContentWord = async (limit: number, language: string, mockResults: any[]) => {
+      const mockAggregate = jest.fn().mockResolvedValue(mockResults);
+      service['content'].aggregate = mockAggregate;
+
+      const result = await service.getContentWord(limit, language);
+
+      expect(mockAggregate).toHaveBeenCalled();
+      expect(result).toHaveProperty('data');
+      expect(result).toHaveProperty('status');
+      expect(result.status).toBe(200);
+    };
+
     it('should return word content', async () => {
       const mockResults = [
         {
@@ -1299,15 +1091,7 @@ describe('contentService', () => {
         },
       ];
 
-      const mockAggregate = jest.fn().mockResolvedValue(mockResults);
-      service['content'].aggregate = mockAggregate;
-
-      const result = await service.getContentWord(5, 'ta');
-
-      expect(mockAggregate).toHaveBeenCalled();
-      expect(result).toHaveProperty('data');
-      expect(result).toHaveProperty('status');
-      expect(result.status).toBe(200);
+      await testContentWord(5, 'ta', mockResults);
     });
 
     it('should handle different languages', async () => {
@@ -1324,18 +1108,24 @@ describe('contentService', () => {
         },
       ];
 
-      const mockAggregate = jest.fn().mockResolvedValue(mockResults);
-      service['content'].aggregate = mockAggregate;
-
-      const result = await service.getContentWord(5, 'hi');
-
-      expect(mockAggregate).toHaveBeenCalled();
-      expect(result).toHaveProperty('data');
-      expect(result.status).toBe(200);
+      await testContentWord(5, 'hi', mockResults);
     });
   });
 
   describe('getContentSentence', () => {
+    // Helper function for content sentence tests
+    const testContentSentence = async (limit: number, language: string, mockResults: any[]) => {
+      const mockAggregate = jest.fn().mockResolvedValue(mockResults);
+      service['content'].aggregate = mockAggregate;
+
+      const result = await service.getContentSentence(limit, language);
+
+      expect(mockAggregate).toHaveBeenCalled();
+      expect(result).toHaveProperty('data');
+      expect(result).toHaveProperty('status');
+      expect(result.status).toBe(200);
+    };
+
     it('should return sentence content', async () => {
       const mockResults = [
         {
@@ -1350,15 +1140,7 @@ describe('contentService', () => {
         },
       ];
 
-      const mockAggregate = jest.fn().mockResolvedValue(mockResults);
-      service['content'].aggregate = mockAggregate;
-
-      const result = await service.getContentSentence(5, 'ta');
-
-      expect(mockAggregate).toHaveBeenCalled();
-      expect(result).toHaveProperty('data');
-      expect(result).toHaveProperty('status');
-      expect(result.status).toBe(200);
+      await testContentSentence(5, 'ta', mockResults);
     });
 
     it('should handle different languages', async () => {
@@ -1375,18 +1157,24 @@ describe('contentService', () => {
         },
       ];
 
-      const mockAggregate = jest.fn().mockResolvedValue(mockResults);
-      service['content'].aggregate = mockAggregate;
-
-      const result = await service.getContentSentence(5, 'hi');
-
-      expect(mockAggregate).toHaveBeenCalled();
-      expect(result).toHaveProperty('data');
-      expect(result.status).toBe(200);
+      await testContentSentence(5, 'hi', mockResults);
     });
   });
 
   describe('getContentParagraph', () => {
+    // Helper function for content paragraph tests
+    const testContentParagraph = async (limit: number, language: string, mockResults: any[]) => {
+      const mockAggregate = jest.fn().mockResolvedValue(mockResults);
+      service['content'].aggregate = mockAggregate;
+
+      const result = await service.getContentParagraph(limit, language);
+
+      expect(mockAggregate).toHaveBeenCalled();
+      expect(result).toHaveProperty('data');
+      expect(result).toHaveProperty('status');
+      expect(result.status).toBe(200);
+    };
+
     it('should return paragraph content', async () => {
       const mockResults = [
         {
@@ -1401,15 +1189,7 @@ describe('contentService', () => {
         },
       ];
 
-      const mockAggregate = jest.fn().mockResolvedValue(mockResults);
-      service['content'].aggregate = mockAggregate;
-
-      const result = await service.getContentParagraph(5, 'ta');
-
-      expect(mockAggregate).toHaveBeenCalled();
-      expect(result).toHaveProperty('data');
-      expect(result).toHaveProperty('status');
-      expect(result.status).toBe(200);
+      await testContentParagraph(5, 'ta', mockResults);
     });
 
     it('should handle different languages', async () => {
@@ -1426,18 +1206,30 @@ describe('contentService', () => {
         },
       ];
 
-      const mockAggregate = jest.fn().mockResolvedValue(mockResults);
-      service['content'].aggregate = mockAggregate;
-
-      const result = await service.getContentParagraph(5, 'hi');
-
-      expect(mockAggregate).toHaveBeenCalled();
-      expect(result).toHaveProperty('data');
-      expect(result.status).toBe(200);
+      await testContentParagraph(5, 'hi', mockResults);
     });
   });
 
   describe('readAll', () => {
+    // Helper function for readAll tests
+    const testReadAll = async (page: number, limit: number, mockResults: any[]) => {
+      const mockFind = jest.fn().mockReturnValue({
+        skip: jest.fn().mockReturnValue({
+          limit: jest.fn().mockReturnValue({
+            exec: jest.fn().mockResolvedValue(mockResults),
+          }),
+        }),
+      });
+
+      service['content'].find = mockFind;
+
+      const result = await service.readAll(page, limit);
+
+      expect(mockFind).toHaveBeenCalled();
+      expect(Array.isArray(result)).toBe(true);
+      expect(result.length).toBe(mockResults.length);
+    };
+
     it('should return all content with pagination', async () => {
       const mockResults = [
         {
@@ -1452,39 +1244,11 @@ describe('contentService', () => {
         },
       ];
 
-      const mockFind = jest.fn().mockReturnValue({
-        skip: jest.fn().mockReturnValue({
-          limit: jest.fn().mockReturnValue({
-            exec: jest.fn().mockResolvedValue(mockResults),
-          }),
-        }),
-      });
-
-      service['content'].find = mockFind;
-
-      const result = await service.readAll(1, 10);
-
-      expect(mockFind).toHaveBeenCalled();
-      expect(Array.isArray(result)).toBe(true);
-      expect(result.length).toBe(2);
+      await testReadAll(1, 10, mockResults);
     });
 
     it('should handle empty results', async () => {
-      const mockFind = jest.fn().mockReturnValue({
-        skip: jest.fn().mockReturnValue({
-          limit: jest.fn().mockReturnValue({
-            exec: jest.fn().mockResolvedValue([]),
-          }),
-        }),
-      });
-
-      service['content'].find = mockFind;
-
-      const result = await service.readAll(1, 10);
-
-      expect(mockFind).toHaveBeenCalled();
-      expect(Array.isArray(result)).toBe(true);
-      expect(result.length).toBe(0);
+      await testReadAll(1, 10, []);
     });
   });
 
