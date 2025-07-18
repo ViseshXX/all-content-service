@@ -7,7 +7,6 @@ import { HttpService } from '@nestjs/axios';
 
 describe('contentService', () => {
   let service: contentService;
-  let model: Model<contentDocument>;
 
   const mockContent = {
     contentId: 'test-content-id',
@@ -106,9 +105,6 @@ describe('contentService', () => {
     }).compile();
 
     service = module.get<contentService>(contentService);
-    model = module.get<Model<contentDocument>>(
-      getModelToken(content.name),
-    );
   });
 
   describe('create', () => {
