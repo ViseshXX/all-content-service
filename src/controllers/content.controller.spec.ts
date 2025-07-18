@@ -744,23 +744,6 @@ describe('contentController', () => {
       send: jest.fn(),
     };
 
-    const mockCollectionId = 'col123';
-
-    const mockPaginatedContent = {
-      data: [
-        {
-          contentId: 'abc123',
-          mechanics_data: [
-            {
-              mechanics_id: 'm1',
-              language: 'en',
-              options: [],
-            },
-          ],
-        },
-      ],
-      status: 200, // or whatever status code is appropriate
-    };
 
     const mockSearchResult = {
       wordsArr: [

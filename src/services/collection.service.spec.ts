@@ -21,17 +21,8 @@ describe('CollectionService', () => {
     },
     status: 'active',
   };
-  const mockSave = jest.fn();
-
-  const mockCollectionDoc = {
-    ...mockCollection,
-    save: jest.fn(),
-  };
-
-  let modelMock: jest.Mock;
 
   beforeEach(async () => {
-    modelMock = jest.fn();
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CollectionService,
@@ -83,24 +74,6 @@ describe('CollectionService', () => {
       );
     });
   });
-
-
-  // describe('create', () => {
-  //   it('should create a new collection (success)', async () => {
-  //     jest.spyOn(model, 'save').mockResolvedValueOnce(mockCollectionDoc);
-  //     const result = await service.create(mockCollection as any);
-  //     expect(result).toEqual(mockCollectionDoc);
-  //   });
-
-  //   it('should fail to create a collection (failure)', async () => {
-  //     jest.spyOn(model, 'save').mockRejectedValueOnce(new Error('DB error'));
-  //     await expect(service.create(mockCollection as any)).rejects.toThrow(
-  //       'DB error',
-  //     );
-  //   });
-  // });
-
-
 
   describe('readAll', () => {
     it('should return all collections (success)', async () => {
