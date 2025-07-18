@@ -14,6 +14,90 @@ describe('CollectionController', () => {
     send: jest.fn(),
   };
 
+  // Common mock data
+  const baseCollectionData = {
+    collectionId: '94312c93-5bb8-4144-8822-9a61ad1cd5a8',
+    name: 'எழுத்துக்கள்',
+    description: 'ASAR Set எழுத்துக்கள்',
+    category: 'Char',
+    author: 'ASER',
+    publisher: 'NCERT',
+    edition: '1st',
+    imagePath: '/images/ezhuthu.png',
+    language: 'ta',
+    difficultyLevel: 'easy',
+    status: 'live',
+    ageGroup: '5-8',
+    flaggedBy: 'admin',
+    lastFlaggedOn: '2024-06-01T10:00:00.000Z',
+    flagReasons: 'Content quality',
+    reviewer: 'QA_Team',
+    reviewStatus: 'approved',
+    level_complexity: {
+      level: 'Level 1',
+      level_competency: 'M0',
+      CEFR_level: 'A1',
+    },
+    tags: ['ASER'] as [string],
+    createdAt: new Date('2024-06-01T10:00:00.000Z'),
+    updatedAt: new Date('2024-06-01T10:00:00.000Z'),
+  };
+
+  const teacherCollectionData = {
+    collectionId: '58009c39-fd86-45a5-bc32-9638a8198521',
+    name: 'Teacher-Teacher',
+    description: 'Teacher-Teacher',
+    category: 'Word',
+    author: 'Ekstep',
+    publisher: 'NCERT',
+    edition: '1st',
+    imagePath: '/images/book.png',
+    language: 'kn',
+    difficultyLevel: 'beginner',
+    status: 'live',
+    ageGroup: '6-8',
+    flaggedBy: 'moderator',
+    lastFlaggedOn: '2024-06-01T10:00:00.000Z',
+    flagReasons: 'Offensive content',
+    reviewer: 'admin',
+    reviewStatus: 'approved',
+    level_complexity: {
+      level: 'Level 1',
+      level_competency: 'm0',
+      CEFR_level: 'A1',
+    },
+    tags: ['ASER'] as [string],
+    createdAt: new Date('2024-06-04T11:07:02.300Z'),
+    updatedAt: new Date('2024-06-04T11:07:02.300Z'),
+  };
+
+  const updateCollectionData = {
+    collectionId: '7b762891-8337-46a6-8eb0-abfcdc5c7f35',
+    name: 'Teacher-Teacher',
+    description: 'Teacher-Teacher',
+    category: 'Word',
+    author: 'Ekstep',
+    publisher: 'NCERT',
+    edition: '1st',
+    imagePath: '/images/book.png',
+    language: 'kn',
+    difficultyLevel: 'easy',
+    status: 'live',
+    ageGroup: '6-8',
+    flaggedBy: 'moderator',
+    lastFlaggedOn: '2024-06-07T06:14:44.161Z',
+    flagReasons: 'Quality issue',
+    reviewer: 'QA_Team',
+    reviewStatus: 'approved',
+    level_complexity: {
+      level: 'Level 1',
+      level_competency: 'M0',
+      CEFR_level: 'A1',
+    },
+    tags: ['ASER'] as [string],
+    createdAt: new Date('2024-06-07T06:14:44.161Z'),
+    updatedAt: new Date('2024-06-07T06:14:44.161Z'),
+  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -46,74 +130,18 @@ describe('CollectionController', () => {
 
   // ---------- Test: POST /collection ----------
   describe('create', () => {
-    const requestBody = {
-      collectionId: '94312c93-5bb8-4144-8822-9a61ad1cd5a8',
-      name: 'எழுத்துக்கள்',
-      description: 'ASAR Set எழுத்துக்கள்',
-      category: 'Char',
-      author: 'ASER',
-      publisher: 'NCERT',
-      edition: '1st',
-      imagePath: '/images/ezhuthu.png',
-      language: 'ta',
-      difficultyLevel: 'easy',
-      status: 'live',
-      ageGroup: '5-8',
-      flaggedBy: 'admin',
-      lastFlaggedOn: '2024-06-01T10:00:00.000Z',
-      flagReasons: 'Content quality',
-      reviewer: 'QA_Team',
-      reviewStatus: 'approved',
-      level_complexity: {
-        level: 'Level 1',
-        level_competency: 'M0',
-        CEFR_level: 'A1',
-      },
-      tags: ['ASER'] as [string], // Tuple with one item
-      createdAt: new Date('2024-06-01T10:00:00.000Z'),
-      updatedAt: new Date('2024-06-01T10:00:00.000Z'),
-    };
-
-    const createdResponse = {
-      collectionId: '94312c93-5bb8-4144-8822-9a61ad1cd5a8',
-      name: 'எழுத்துக்கள்',
-      description: 'ASAR Set எழுத்துக்கள்',
-      category: 'Char',
-      author: 'ASER',
-      publisher: 'NCERT',
-      edition: '1st',
-      imagePath: '/images/ezhuthu.png',
-      language: 'ta',
-      difficultyLevel: 'easy',
-      status: 'live',
-      ageGroup: '5-8',
-      flaggedBy: 'admin',
-      lastFlaggedOn: '2024-06-01T10:00:00.000Z',
-      flagReasons: 'Content quality',
-      reviewer: 'QA_Team',
-      reviewStatus: 'approved',
-      level_complexity: {
-        level: 'Level 1',
-        level_competency: 'M0',
-        CEFR_level: 'A1',
-      },
-      tags: ['ASER'] as [string], // Tuple with one item
-      createdAt: new Date('2024-06-01T10:00:00.000Z'),
-      updatedAt: new Date('2024-06-01T10:00:00.000Z'),
-    };
-
     it('should create a new collection and return it', async () => {
       jest
         .spyOn(service, 'create')
-        .mockImplementation(() => Promise.resolve(createdResponse));
+        .mockImplementation(() => Promise.resolve(baseCollectionData));
 
-      await controller.create(mockReply as FastifyReply, requestBody);
+      await controller.create(mockReply as FastifyReply, baseCollectionData);
 
-      expect(service.create).toHaveBeenCalledWith(requestBody);
+      expect(service.create).toHaveBeenCalledWith(baseCollectionData);
       expect(mockReply.status).toHaveBeenCalledWith(HttpStatus.CREATED);
       expect(mockReply.send).toHaveBeenCalledWith({
         status: 'success',
-        data: createdResponse,
+        data: baseCollectionData,
       });
     });
 
@@ -121,7 +149,7 @@ describe('CollectionController', () => {
       const error = new Error('DB Insert Failed');
       jest.spyOn(service, 'create').mockRejectedValue(error);
 
-      await controller.create(mockReply as FastifyReply, requestBody);
+      await controller.create(mockReply as FastifyReply, baseCollectionData);
 
       expect(mockReply.status).toHaveBeenCalledWith(
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -138,31 +166,7 @@ describe('CollectionController', () => {
     const mockCollections = [
       {
         _id: '665ef5896e1219eb3d1a9b21',
-        collectionId: '58009c39-fd86-45a5-bc32-9638a8198521',
-        name: 'Teacher-Teacher',
-        description: 'Teacher-Teacher',
-        category: 'Word',
-        author: 'Ekstep',
-        publisher: 'NCERT',
-        edition: '1st',
-        imagePath: '/images/book.png',
-        language: 'kn',
-        difficultyLevel: 'beginner',
-        status: 'live',
-        ageGroup: '6-8',
-        flaggedBy: 'moderator',
-        lastFlaggedOn: '2024-06-01T10:00:00.000Z',
-        flagReasons: 'Offensive content',
-        reviewer: 'admin',
-        reviewStatus: 'approved',
-        level_complexity: {
-          level: 'Level 1',
-          level_competency: 'm0',
-          CEFR_level: 'A1',
-        },
-        tags: ['ASER'] as [string], // ✅ use `string[]` only if `tags` is defined as `string[]` in the model
-        createdAt: new Date('2024-06-04T11:07:02.300Z'),
-        updatedAt: new Date('2024-06-04T11:07:02.300Z'),
+        ...teacherCollectionData,
       },
     ];
 
@@ -204,31 +208,7 @@ describe('CollectionController', () => {
     const mockCollections = [
       {
         _id: '665ef5896e1219eb3d1a9b21',
-        collectionId: '58009c39-fd86-45a5-bc32-9638a8198521',
-        name: 'Teacher-Teacher',
-        description: 'Teacher-Teacher',
-        category: 'Word',
-        author: 'Ekstep',
-        publisher: 'NCERT',
-        edition: '1st',
-        imagePath: '/images/book.png',
-        language: 'kn',
-        difficultyLevel: 'beginner',
-        status: 'live',
-        ageGroup: '6-8',
-        flaggedBy: 'moderator',
-        lastFlaggedOn: '2024-06-01T10:00:00.000Z',
-        flagReasons: 'Offensive content',
-        reviewer: 'admin',
-        reviewStatus: 'approved',
-        level_complexity: {
-          level: 'Level 1',
-          level_competency: 'm0',
-          CEFR_level: 'A1',
-        },
-        tags: ['ASER'] as [string],
-        createdAt: new Date('2024-06-04T11:07:02.300Z'),
-        updatedAt: new Date('2024-06-04T11:07:02.300Z'),
+        ...teacherCollectionData,
         __v: 0,
       },
     ];
@@ -267,31 +247,7 @@ describe('CollectionController', () => {
 
     const mockCollection = {
       _id: '6662a5848946f51e15abb9fd',
-      collectionId: '7b762891-8337-46a6-8eb0-abfcdc5c7f35',
-      name: 'Teacher-Teacher',
-      description: 'Teacher-Teacher',
-      category: 'Word',
-      author: 'Ekstep',
-      publisher: 'NCERT',
-      edition: '1st',
-      imagePath: '/images/book.png',
-      language: 'kn',
-      difficultyLevel: 'easy',
-      status: 'live',
-      ageGroup: '6-8',
-      flaggedBy: 'moderator',
-      lastFlaggedOn: '2024-06-07T06:14:44.161Z',
-      flagReasons: 'Quality issue',
-      reviewer: 'QA_Team',
-      reviewStatus: 'approved',
-      level_complexity: {
-        level: 'Level 1',
-        level_competency: 'M0',
-        CEFR_level: 'A1',
-      },
-      tags: ['ASER'] as [string], // Tuple with one item
-      createdAt: new Date('2024-06-07T06:14:44.161Z'),
-      updatedAt: new Date('2024-06-07T06:14:44.161Z'),
+      ...updateCollectionData,
       __v: 0,
     };
 
@@ -314,31 +270,7 @@ describe('CollectionController', () => {
 
     const updatePayload = {
       _id: '6662a5848946f51e15abb9fd',
-      collectionId: '7b762891-8337-46a6-8eb0-abfcdc5c7f35',
-      name: 'Teacher-Teacher',
-      description: 'Teacher-Teacher',
-      category: 'Word',
-      author: 'Ekstep',
-      publisher: 'NCERT',
-      edition: '1st',
-      imagePath: '/images/book.png',
-      language: 'kn',
-      difficultyLevel: 'easy',
-      status: 'live',
-      ageGroup: '6-8',
-      flaggedBy: 'moderator',
-      lastFlaggedOn: '2024-06-07T06:14:44.161Z',
-      flagReasons: 'Quality issue',
-      reviewer: 'QA_Team',
-      reviewStatus: 'approved',
-      level_complexity: {
-        level: 'Level 1',
-        level_competency: 'M0',
-        CEFR_level: 'A1',
-      },
-      tags: ['ASER'] as [string], // Tuple with one item
-      createdAt: new Date('2024-06-07T06:14:44.161Z'),
-      updatedAt: new Date('2024-06-07T06:14:44.161Z'),
+      ...updateCollectionData,
       __v: 0,
     };
 
