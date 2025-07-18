@@ -43,61 +43,6 @@ describe('CollectionController', () => {
     updatedAt: new Date('2024-06-01T10:00:00.000Z'),
   };
 
-  const teacherCollectionData = {
-    collectionId: '58009c39-fd86-45a5-bc32-9638a8198521',
-    name: 'Teacher-Teacher',
-    description: 'Teacher-Teacher',
-    category: 'Word',
-    author: 'Ekstep',
-    publisher: 'NCERT',
-    edition: '1st',
-    imagePath: '/images/book.png',
-    language: 'kn',
-    difficultyLevel: 'beginner',
-    status: 'live',
-    ageGroup: '6-8',
-    flaggedBy: 'moderator',
-    lastFlaggedOn: '2024-06-01T10:00:00.000Z',
-    flagReasons: 'Offensive content',
-    reviewer: 'admin',
-    reviewStatus: 'approved',
-    level_complexity: {
-      level: 'Level 1',
-      level_competency: 'm0',
-      CEFR_level: 'A1',
-    },
-    tags: ['ASER'] as [string],
-    createdAt: new Date('2024-06-04T11:07:02.300Z'),
-    updatedAt: new Date('2024-06-04T11:07:02.300Z'),
-  };
-
-  const updateCollectionData = {
-    collectionId: '7b762891-8337-46a6-8eb0-abfcdc5c7f35',
-    name: 'Teacher-Teacher',
-    description: 'Teacher-Teacher',
-    category: 'Word',
-    author: 'Ekstep',
-    publisher: 'NCERT',
-    edition: '1st',
-    imagePath: '/images/book.png',
-    language: 'kn',
-    difficultyLevel: 'easy',
-    status: 'live',
-    ageGroup: '6-8',
-    flaggedBy: 'moderator',
-    lastFlaggedOn: '2024-06-07T06:14:44.161Z',
-    flagReasons: 'Quality issue',
-    reviewer: 'QA_Team',
-    reviewStatus: 'approved',
-    level_complexity: {
-      level: 'Level 1',
-      level_competency: 'M0',
-      CEFR_level: 'A1',
-    },
-    tags: ['ASER'] as [string],
-    createdAt: new Date('2024-06-07T06:14:44.161Z'),
-    updatedAt: new Date('2024-06-07T06:14:44.161Z'),
-  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -166,7 +111,7 @@ describe('CollectionController', () => {
     const mockCollections = [
       {
         _id: '665ef5896e1219eb3d1a9b21',
-        ...teacherCollectionData,
+        ...baseCollectionData,
       },
     ];
 
@@ -208,7 +153,7 @@ describe('CollectionController', () => {
     const mockCollections = [
       {
         _id: '665ef5896e1219eb3d1a9b21',
-        ...teacherCollectionData,
+        ...baseCollectionData,
         __v: 0,
       },
     ];
@@ -247,7 +192,7 @@ describe('CollectionController', () => {
 
     const mockCollection = {
       _id: '6662a5848946f51e15abb9fd',
-      ...updateCollectionData,
+      ...baseCollectionData,
       __v: 0,
     };
 
@@ -270,7 +215,7 @@ describe('CollectionController', () => {
 
     const updatePayload = {
       _id: '6662a5848946f51e15abb9fd',
-      ...updateCollectionData,
+      ...baseCollectionData,
       __v: 0,
     };
 
