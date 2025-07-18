@@ -1,14 +1,14 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getModelToken } from '@nestjs/mongoose';
 import { contentService } from './content.service';
-import { content, contentDocument } from 'src/schemas/content.schema';
-import { Model } from 'mongoose';
+import { content } from 'src/schemas/content.schema';
 import { HttpService } from '@nestjs/axios';
 
 describe('contentService', () => {
   let service: contentService;
 
-  const mockContent = {
+  // Base mock content data to reduce duplication
+  const baseMockContent = {
     contentId: 'test-content-id',
     collectionId: 'test-collection-id',
     name: 'Test Content',
@@ -64,6 +64,33 @@ describe('contentService', () => {
     updatedAt: new Date(),
   };
 
+  // Helper function to create content variations
+  const createMockContent = (overrides: Partial<typeof baseMockContent> = {}) => ({
+    ...baseMockContent,
+    ...overrides,
+  });
+
+  // Helper function to create content source data
+  const createContentSourceData = (text: string, language: string = 'en', phonemes?: string[], syllableCount?: number) => ({
+    language,
+    text,
+    ...(phonemes && { phonemes }),
+    ...(syllableCount && { syllableCount }),
+  });
+
+  // Helper function to create mechanics data
+  const createMechanicsData = (mechanicsId: string, language: string = 'en') => ({
+    mechanics_id: mechanicsId,
+    language,
+  });
+
+  // Helper function to create search results
+  const createSearchResult = (contentId: string, contentType: string, text: string, language: string = 'en', phonemes?: string[], syllableCount?: number) => ({
+    contentId,
+    contentType,
+    contentSourceData: [createContentSourceData(text, language, phonemes, syllableCount)],
+  });
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -110,17 +137,17 @@ describe('contentService', () => {
   describe('create', () => {
     it('should create content successfully', async () => {
       // Mock the service method directly
-      jest.spyOn(service, 'create').mockResolvedValue(mockContent as any);
+      jest.spyOn(service, 'create').mockResolvedValue(baseMockContent as any);
       
-      const result = await service.create(mockContent as any);
-      expect(result).toEqual(mockContent);
+      const result = await service.create(baseMockContent as any);
+      expect(result).toEqual(baseMockContent);
     });
 
     it('should handle database errors', async () => {
       // Mock the service method to throw an error
       jest.spyOn(service, 'create').mockRejectedValue(new Error('Database connection failed'));
       
-      await expect(service.create(mockContent as any)).rejects.toThrow(
+      await expect(service.create(baseMockContent as any)).rejects.toThrow(
         'Database connection failed',
       );
     });
@@ -129,18 +156,7 @@ describe('contentService', () => {
   describe('search', () => {
     it('should search content successfully', async () => {
       const mockResults = [
-        {
-          contentId: 'search-result-1',
-          contentType: 'Word',
-          contentSourceData: [
-            {
-              language: 'en',
-              text: 'apple',
-              phonemes: ['AE', 'P', 'AH', 'L'],
-              syllableCount: 2,
-            },
-          ],
-        },
+        createSearchResult('search-result-1', 'Word', 'apple', 'en', ['AE', 'P', 'AH', 'L'], 2),
       ];
 
       const mockAggregate = jest.fn().mockImplementation(() => ({
@@ -219,15 +235,7 @@ describe('contentService', () => {
     it('should handle search with tags parameter', async () => {
       const mockSearchResults = [
         {
-          contentId: 'tagged-content1',
-          contentType: 'Word',
-          contentSourceData: [
-            {
-              language: 'ta',
-              text: 'குழந்தை',
-              syllableCount: 3,
-            },
-          ],
+          ...createSearchResult('tagged-content1', 'Word', 'குழந்தை', 'ta', ['K', 'U', 'Z', 'AH', 'N', 'T', 'AH'], 2),
           tags: ['family', 'person'],
         },
       ];
@@ -259,16 +267,7 @@ describe('contentService', () => {
     it('should handle search with multiple tags', async () => {
       const mockSearchResults = [
         {
-          contentId: 'multi-tagged-content',
-          contentType: 'Word',
-          contentSourceData: [
-            {
-              language: 'en',
-              text: 'family',
-              syllableCount: 2,
-              phonemes: ['F', 'AE', 'M', 'IH', 'L', 'IY'],
-            },
-          ],
+          ...createSearchResult('multi-tagged-content', 'Word', 'family', 'en', ['F', 'AE', 'M', 'IH', 'L', 'IY'], 2),
           tags: ['family', 'person', 'relationship'],
         },
       ];
@@ -299,16 +298,7 @@ describe('contentService', () => {
     it('should handle search with CEFR levels', async () => {
       const mockSearchResults = [
         {
-          contentId: 'cefr-content',
-          contentType: 'Word',
-          contentSourceData: [
-            {
-              language: 'en',
-              text: 'basic',
-              syllableCount: 2,
-              phonemes: ['B', 'AE', 'S', 'IH', 'K'],
-            },
-          ],
+          ...createSearchResult('cefr-content', 'Word', 'basic', 'en', ['B', 'AE', 'S', 'IH', 'K'], 2),
           level_complexity: {
             CEFR_level: 'A1',
           },
@@ -341,16 +331,7 @@ describe('contentService', () => {
     it('should handle search with level competency', async () => {
       const mockSearchResults = [
         {
-          contentId: 'competency-content',
-          contentType: 'Word',
-          contentSourceData: [
-            {
-              language: 'en',
-              text: 'competency',
-              syllableCount: 4,
-              phonemes: ['K', 'AA', 'M', 'P', 'EH', 'T', 'EH', 'N', 'S', 'IY'],
-            },
-          ],
+          ...createSearchResult('competency-content', 'Word', 'competency', 'en', ['K', 'AA', 'M', 'P', 'EH', 'T', 'EH', 'N', 'S', 'IY'], 4),
           level_complexity: {
             level_competency: 'L1.1',
           },
@@ -382,18 +363,7 @@ describe('contentService', () => {
 
     it('should handle search with graphemes mapping', async () => {
       const mockSearchResults = [
-        {
-          contentId: 'grapheme-content',
-          contentType: 'Word',
-          contentSourceData: [
-            {
-              language: 'en',
-              text: 'grapheme',
-              syllableCount: 2,
-              phonemes: ['G', 'R', 'AE', 'F', 'IY', 'M'],
-            },
-          ],
-        },
+        createSearchResult('grapheme-content', 'Word', 'grapheme', 'en', ['G', 'R', 'AE', 'F', 'IY', 'M'], 2),
       ];
 
       const mockAggregate = jest.fn().mockImplementation(() => ({
@@ -889,10 +859,7 @@ describe('contentService', () => {
           contentType: 'Word',
           language: 'en',
           mechanics_data: [
-            {
-              mechanics_id: 'mech_001',
-              language: 'en',
-            },
+            createMechanicsData('mech_001', 'en'),
           ],
           level_complexity: {
             level_competency: 'L1.1',
@@ -942,10 +909,7 @@ describe('contentService', () => {
           contentType: 'Word',
           language: 'en',
           mechanics_data: [
-            {
-              mechanics_id: 'mech_001',
-              language: 'en',
-            },
+            createMechanicsData('mech_001', 'en'),
           ],
         },
       ];
@@ -974,10 +938,7 @@ describe('contentService', () => {
           contentType: 'Word',
           language: 'en',
           mechanics_data: [
-            {
-              mechanics_id: 'mech_001',
-              language: 'en',
-            },
+            createMechanicsData('mech_001', 'en'),
           ],
           level_complexity: {
             level_competency: 'L1.1',
@@ -991,10 +952,7 @@ describe('contentService', () => {
           contentType: 'Word',
           language: 'en',
           mechanics_data: [
-            {
-              mechanics_id: 'mech_001',
-              language: 'en',
-            },
+            createMechanicsData('mech_001', 'en'),
           ],
         },
       ];
@@ -1033,10 +991,7 @@ describe('contentService', () => {
           contentType: 'Word',
           language: 'en',
           mechanics_data: [
-            {
-              mechanics_id: 'mech_001',
-              language: 'en',
-            },
+            createMechanicsData('mech_001', 'en'),
           ],
         },
       ];
@@ -1121,10 +1076,7 @@ describe('contentService', () => {
           contentType: 'Sentence',
           language: 'en',
           mechanics_data: [
-            {
-              mechanics_id: 'mech_001',
-              language: 'en',
-            },
+            createMechanicsData('mech_001', 'en'),
           ],
         },
       ];
@@ -1153,10 +1105,7 @@ describe('contentService', () => {
           contentType: 'Word',
           language: 'ta',
           mechanics_data: [
-            {
-              mechanics_id: 'mech_001',
-              language: 'ta',
-            },
+            createMechanicsData('mech_001', 'ta'),
           ],
         },
       ];
@@ -1185,10 +1134,7 @@ describe('contentService', () => {
           contentType: 'Word',
           language: 'en',
           mechanics_data: [
-            {
-              mechanics_id: 'mech_001',
-              language: 'en',
-            },
+            createMechanicsData('mech_001', 'en'),
           ],
           level_complexity: {
             CEFR_level: 'A1',
@@ -1606,12 +1552,11 @@ describe('contentService', () => {
 
   describe('update', () => {
     it('should update content successfully', async () => {
-      const updatedContent = {
+      const updatedContent = createMockContent({
         contentId: 'test-id',
         collectionId: 'test-collection',
         name: 'Updated Content',
         contentType: 'Word',
-        imagePath: '/path/to/image',
         contentSourceData: [
           {
             text: 'updated',
@@ -1619,24 +1564,11 @@ describe('contentService', () => {
             syllableCount: 3,
           },
         ],
-        mechanics_data: [],
         level_complexity: {
           level: 'intermediate',
           level_competency: 'intermediate',
         },
-        flaggedBy: '',
-        lastFlaggedOn: '',
-        flagReasons: '',
-        reviewer: '',
-        reviewStatus: '',
-        status: 'active',
-        publisher: 'test-publisher',
-        language: 'en',
-        contentIndex: 1,
-        tags: ['test'],
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
+      });
 
       const mockFindByIdAndUpdate = jest.fn().mockResolvedValue(updatedContent);
       service['content'].findByIdAndUpdate = mockFindByIdAndUpdate;
