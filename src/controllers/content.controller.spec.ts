@@ -1408,17 +1408,5 @@ describe('contentController', () => {
       });
     });
 
-    // it('should handle deletion error', async () => {
-    //   const error = new Error('Deletion failed');
-    //   jest.spyOn(service, 'delete').mockRejectedValue(error);
-
-    //   await controller.delete(mockReply as any, contentId);
-
-    //   expect(mockReply.status).toHaveBeenCalledWith(500);
-    //   expect(mockReply.send).toHaveBeenCalledWith({
-    //     status: 'error',
-    //     message: 'Server error - ' + error,
-    //   });
-    // });
   });
 });

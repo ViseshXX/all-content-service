@@ -310,20 +310,6 @@ describe('CollectionController', () => {
       });
     });
 
-    // it('should return 500 if service fails', async () => {
-    //   const error = new Error('DB readById error');
-    //   jest.spyOn(service, 'readById').mockRejectedValue(error);
-
-    //   await controller.findById(mockReply as FastifyReply, mockId);
-
-    //   expect(mockReply.status).toHaveBeenCalledWith(
-    //     HttpStatus.INTERNAL_SERVER_ERROR,
-    //   );
-    //   expect(mockReply.send).toHaveBeenCalledWith({
-    //     status: 'error',
-    //     message: 'Server error - ' + error,
-    //   });
-    // });
   });
 
   describe('update', () => {
@@ -376,20 +362,6 @@ describe('CollectionController', () => {
       });
     });
 
-    // it('should return 500 if update service fails', async () => {
-    //   const error = new Error('Update failed');
-    //   jest.spyOn(service, 'update').mockRejectedValue(error);
-
-    //   await controller.update(mockReply as FastifyReply, mockId, updatePayload);
-
-    //   expect(mockReply.status).toHaveBeenCalledWith(
-    //     HttpStatus.INTERNAL_SERVER_ERROR,
-    //   );
-    //   expect(mockReply.send).toHaveBeenCalledWith({
-    //     status: 'error',
-    //     message: 'Server error - ' + error,
-    //   });
-    // });
   });
 
   describe('delete', () => {
@@ -411,20 +383,5 @@ describe('CollectionController', () => {
         deleted: mockDeletedResponse,
       });
     });
-
-    // it('should return 500 if deletion fails', async () => {
-    //   const error = new Error('Deletion failed');
-    //   jest.spyOn(service, 'delete').mockRejectedValue(error);
-
-    //   await controller.delete(mockReply as FastifyReply, mockId);
-
-    //   expect(mockReply.status).toHaveBeenCalledWith(
-    //     HttpStatus.INTERNAL_SERVER_ERROR,
-    //   );
-    //   expect(mockReply.send).toHaveBeenCalledWith({
-    //     status: 'error',
-    //     message: 'Server error - ' + error,
-    //   });
-    // });
   });
 });
