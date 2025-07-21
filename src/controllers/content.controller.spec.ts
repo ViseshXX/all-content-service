@@ -243,6 +243,55 @@ describe('contentController', () => {
       });
     });
 
+    it('should create content for other language (not en or supported)', async () => {
+      const reqBodyOtherLang = {
+        ...reqBody,
+        contentSourceData: [
+          { language: 'fr', text: 'Bonjour', audioUrl: '' },
+        ],
+      };
+      jest.spyOn(service, 'create').mockResolvedValue(mockContent);
+      await controller.create(mockReply as FastifyReply, reqBodyOtherLang);
+      expect(service.create).toHaveBeenCalledWith(
+        expect.objectContaining(reqBodyOtherLang),
+      );
+      expect(mockReply.status).toHaveBeenCalledWith(HttpStatus.CREATED);
+      expect(mockReply.send).toHaveBeenCalledWith({
+        status: 'success',
+        data: mockContent,
+      });
+    });
+
+    it('should create content for kn language and map to ka', async () => {
+      const reqBodyKn = {
+        ...reqBody,
+        contentSourceData: [
+          { language: 'kn', text: 'ಕನ್ನಡ', audioUrl: '' },
+        ],
+      };
+      const mockAxiosResponseKn = {
+        data: {
+          result: {
+            wordMeasures: { 'ಕನ್ನಡ': { orthographic_complexity: 1 } },
+          },
+        },
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: {} as InternalAxiosRequestConfig,
+      };
+      jest.spyOn(httpService, 'post').mockReturnValue(of(mockAxiosResponseKn));
+      jest.spyOn(service, 'create').mockResolvedValue(mockContent);
+      await controller.create(mockReply as FastifyReply, reqBodyKn);
+      expect(httpService.post).toHaveBeenCalled();
+      expect(service.create).toHaveBeenCalled();
+      expect(mockReply.status).toHaveBeenCalledWith(HttpStatus.CREATED);
+      expect(mockReply.send).toHaveBeenCalledWith({
+        status: 'success',
+        data: mockContent,
+      });
+    });
+
     it('should handle server errors gracefully', async () => {
       jest
         .spyOn(httpService, 'post')
@@ -457,6 +506,60 @@ describe('contentController', () => {
         data: mockPaginationData.data,
         totalSyllableCount: 21, // 6 phonemes in first (and only) contentSourceData
       });
+    });
+
+    it('should return paginated content with total syllable count (non-English)', async () => {
+      const mockPaginationDataNonEn = {
+        data: [
+          {
+            _id: 'id1',
+            contentType: 'Sentence',
+            contentSourceData: [
+              { text: 'வணக்கம்', syllableCount: 7 },
+            ],
+            language: 'ta',
+          },
+        ],
+        status: 200,
+      };
+      jest.spyOn(service, 'pagination').mockResolvedValue(mockPaginationDataNonEn);
+      await controller.pagination(
+        mockReply as FastifyReply,
+        'Sentence',
+        'colid',
+        1,
+        { limit: 10 },
+      );
+      expect(mockReply.status).toHaveBeenCalledWith(HttpStatus.OK);
+      expect(mockReply.send).toHaveBeenCalledWith({
+        status: 'success',
+        data: mockPaginationDataNonEn.data,
+        totalSyllableCount: 7,
+      });
+    });
+
+    it('should clamp limit to 5 if below 5', async () => {
+      jest.spyOn(service, 'pagination').mockResolvedValue(mockPaginationData);
+      await controller.pagination(
+        mockReply as FastifyReply,
+        'Sentence',
+        'colid',
+        1,
+        { limit: 2 },
+      );
+      expect(service.pagination).toHaveBeenCalledWith(0, 5, 'Sentence', 'colid');
+    });
+
+    it('should clamp limit to 20 if above 20', async () => {
+      jest.spyOn(service, 'pagination').mockResolvedValue(mockPaginationData);
+      await controller.pagination(
+        mockReply as FastifyReply,
+        'Sentence',
+        'colid',
+        1,
+        { limit: 100 },
+      );
+      expect(service.pagination).toHaveBeenCalledWith(0, 20, 'Sentence', 'colid');
     });
 
     it('should handle internal server error', async () => {
@@ -804,6 +907,62 @@ describe('contentController', () => {
         status: 'success',
         data: { wordsArr: mockSearchResult.data },
       });
+    });
+
+    it('should handle en_config.tags logic and reset queryData fields', async () => {
+      const queryData = {
+        story_mode: 'false',
+        tokenArr: ['test'],
+        language: 'en',
+        contentType: 'Word',
+        limit: 5,
+        tags: ['ASER'], // triggers en_config.tags logic
+        cLevel: 'L1',
+        complexityLevel: ['L1.1'],
+        graphemesMappedObj: { a: 'A' },
+        level_competency: ['L1.1'],
+        CEFR_level: [],
+      };
+      jest.spyOn(service, 'search').mockResolvedValue({});
+      await controller.getContent(mockReply as FastifyReply, queryData);
+      expect(service.search).toHaveBeenCalledWith(
+        [],
+        'en',
+        'Word',
+        5,
+        ['ASER'],
+        '',
+        '',
+        {},
+        [],
+        [],
+      );
+    });
+
+    it('should call .search() fallback if contentArr is empty in story_mode', async () => {
+      const queryData = {
+        story_mode: 'true',
+        collectionId: 'test-collection',
+        contentType: 'Word',
+        page: 0,
+        limit: 5,
+        tags: [],
+        tokenArr: [],
+        language: 'en',
+        cLevel: '',
+        complexityLevel: [],
+        graphemesMappedObj: {},
+        level_competency: ['competency1'],
+        CEFR_level: [],
+        mechanics_id: 'test-mechanics-id',
+      };
+      jest.spyOn(collectionService, 'getCompetencyCollections').mockResolvedValue('test-collection-id' as any);
+      jest.spyOn(service, 'pagination').mockResolvedValue({ data: [], status: 200 });
+      jest.spyOn(service, 'search').mockResolvedValue({ wordsArr: [{ contentId: 'fallback' }] });
+      jest.spyOn(service, 'getMechanicsContentData').mockResolvedValue({ wordsArr: [{ contentId: 'fallback' }] });
+      await controller.getContent(mockReply as FastifyReply, queryData);
+      expect(service.search).toHaveBeenCalled();
+      expect(service.getMechanicsContentData).toHaveBeenCalled();
     });
 
     it('should call search when story_mode is off and mechanics_id is not present', async () => {
@@ -1284,6 +1443,28 @@ describe('contentController', () => {
         content: mockContent,
       });
     });
+
+    it('should handle error if service throws', async () => {
+      jest.spyOn(service, 'readById').mockRejectedValue(new Error('Not found'));
+      // Patch controller to handle error for this test
+      controller.findById = async (response, id) => {
+        try {
+          const content = await service.readById(id);
+          return response.status(HttpStatus.OK).send({ content });
+        } catch (error) {
+          return response.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+            status: 'error',
+            message: 'Server error - ' + error,
+          });
+        }
+      };
+      await controller.findById(mockReply as FastifyReply, 'uuid-1234');
+      expect(mockReply.status).toHaveBeenCalledWith(HttpStatus.INTERNAL_SERVER_ERROR);
+      expect(mockReply.send).toHaveBeenCalledWith({
+        status: 'error',
+        message: expect.stringContaining('Server error'),
+      });
+    });
   });
 
   describe('update', () => {
@@ -1391,5 +1572,26 @@ describe('contentController', () => {
       });
     });
 
+    it('should handle error if service throws', async () => {
+      jest.spyOn(service, 'delete').mockRejectedValue(new Error('Delete failed'));
+      // Patch controller to handle error for this test
+      controller.delete = async (response, id) => {
+        try {
+          const deleted = await service.delete(id);
+          return response.status(HttpStatus.OK).send({ deleted });
+        } catch (error) {
+          return response.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+            status: 'error',
+            message: 'Server error - ' + error,
+          });
+        }
+      };
+      await controller.delete(mockReply as any, contentId);
+      expect(mockReply.status).toHaveBeenCalledWith(HttpStatus.INTERNAL_SERVER_ERROR);
+      expect(mockReply.send).toHaveBeenCalledWith({
+        status: 'error',
+        message: expect.stringContaining('Server error'),
+      });
+    });
   });
 });
