@@ -91,6 +91,17 @@
     "testEnvironment": "node",
     "moduleNameMapper": {
       "^src/(.*)$": "<rootDir>/src/$1"
-    }
+    },
+    "coveragePathIgnorePatterns": [
+      "/node_modules/",
+      "main.ts",
+      "app.module.ts",
+      ".dto.ts",
+      ".interface.ts",
+      ".schema.ts",
+      "/src/config/language/",
+      "app-cluster.service.ts",
+      "auth.module.ts"
+    ]
   }
 }
