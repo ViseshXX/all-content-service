@@ -221,6 +221,7 @@ var common_config = {
       contentType: 'Sentence',
     },
   ],
+  readingComplexityLang : ['hi','te','kn']
 };
 
 export default common_config;
