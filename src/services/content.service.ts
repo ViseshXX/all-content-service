@@ -335,7 +335,7 @@ export class contentService {
     CEFR_level = [],
   ): Promise<any> {
     let nextTokenArr = [];
-    let readingComplexityLang = ['hi'];
+    let readingComplexityLang = ['hi','te','kn'];
     if (tokenArr.length >= limit * 2) {
       nextTokenArr = tokenArr.slice(limit, limit * 2);
     } else {
