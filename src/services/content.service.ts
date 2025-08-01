@@ -36,6 +36,10 @@ export class contentService {
     return await this.content.findOne({ contentId: id }).exec();
   }
 
+  async readByIds(ids: string[]): Promise<content[]> {
+    return await this.content.find({ contentId: { $in: ids } }).exec();
+  }
+
   async update(id, content: content): Promise<content> {
     return await this.content.findByIdAndUpdate(id, content, { new: true });
   }
