@@ -1327,10 +1327,28 @@ export class contentController {
   @ApiExcludeEndpoint(true)
   @Get('/:id')
   async findById(@Res() response: FastifyReply, @Param('id') id) {
-    const content = await this.contentService.readById(id);
-    return response.status(HttpStatus.OK).send({
-      content,
-    });
+    try {
+      // Check if multiple IDs are provided
+      if (id.includes(',')) {
+        const ids = id.split(',').map(id => id.trim());
+        const contents = await this.contentService.readByIds(ids);
+        return response.status(HttpStatus.OK).send({
+          contents,
+          count: contents.length,
+        });
+      } else {
+        // Single ID
+        const content = await this.contentService.readById(id);
+        return response.status(HttpStatus.OK).send({
+          content,
+        });
+      }
+    } catch (error) {
+      return response.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+        status: 'error',
+        message: 'Error fetching content: ' + error.message,
+      });
+    }
   }
 
   @ApiExcludeEndpoint(true)
