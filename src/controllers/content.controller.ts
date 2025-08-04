@@ -29,6 +29,7 @@ import {
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/auth/auth.guard';
 import en_config from 'src/config/language/en';
+import common_config from 'src/config/commonConfig';
 
 @ApiTags('content')
 @Controller('content')
@@ -256,6 +257,23 @@ export class contentController {
 
             for (const wordEle of contentSourceDataEle['text'].split(' ')) {
               syllableCountMap[wordEle] = await getSyllableCount(wordEle);
+            }
+            if(common_config.readingComplexityLang.includes(contentSourceDataEle['language'])) {
+              const urls = process.env.ALL_TEXT_EVAL_API + 'getReadingComplexity';
+              const reqBody = {
+                language: contentLanguage,
+                text: contentSourceDataEle['text'],
+              };
+              const readingComplexity = await lastValueFrom(
+                this.httpService
+                  .post(urls, reqBody, {
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                  })
+                  .pipe(map((resp) => resp.data))
+              );
+              newContent.result.readingComplexity = readingComplexity.total_score;
             }
 
             newContent.result.wordMeasures = newWordMeasures;
