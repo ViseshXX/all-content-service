@@ -39,7 +39,7 @@ export class contentController {
     private readonly contentService: contentService,
     private readonly collectionService: CollectionService,
     private readonly httpService: HttpService,
-  ) {}
+  ) { }
 
   @ApiBody({
     description: 'Request body for storing the data into the content',
@@ -1057,14 +1057,14 @@ export class contentController {
       let contentCollection;
       let collectionId;
 
-      if(en_config.tags.some(tag => queryData.tags.some(qtag => qtag.includes(tag)))){
+      if (en_config.tags.some(tag => queryData.tags.some(qtag => qtag.includes(tag)))) {
         queryData.cLevel = "";
         queryData.complexityLevel = "";
         queryData.graphemesMappedObj = {};
         queryData.level_competency = [];
         queryData.tokenArr = [];
       }
-      
+
       if (
         queryData.story_mode === 'true' &&
         queryData.level_competency.length > 0
@@ -1343,24 +1343,17 @@ export class contentController {
   }
 
   @ApiExcludeEndpoint(true)
-  @Get('/:id')
-  async findById(@Res() response: FastifyReply, @Param('id') id) {
+  @Get('/getByIds')
+  async findByIds(@Res() response: FastifyReply, @Query('ids') ids: string) {
     try {
-      // Check if multiple IDs are provided
-      if (id.includes(',')) {
-        const ids = id.split(',').map(id => id.trim());
-        const contents = await this.contentService.readByIds(ids);
-        return response.status(HttpStatus.OK).send({
-          contents,
-          count: contents.length,
-        });
-      } else {
-        // Single ID
-        const content = await this.contentService.readById(id);
-        return response.status(HttpStatus.OK).send({
-          content,
-        });
-      }
+      const idList = ids.split(',').map(id => id.trim());
+
+      const contents = await this.contentService.readByIds(idList);
+
+      return response.status(HttpStatus.OK).send({
+        contents,
+        count: contents.length,
+      });
     } catch (error) {
       return response.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
         status: 'error',
@@ -1368,6 +1361,7 @@ export class contentController {
       });
     }
   }
+
 
   @ApiExcludeEndpoint(true)
   @Put('/:id')
