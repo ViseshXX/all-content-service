@@ -23,5 +23,5 @@ jobs:
         script: |
              
              cd /home/sudeepr/git/all-content-service
-             ./deploy.sh /home/sudeepr/git/all-content-service lais-v2.2 deploy
+             ./deploy.sh /home/sudeepr/git/all-content-service/all-content-service lais-v2.2 deploy
              
