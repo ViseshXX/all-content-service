@@ -726,26 +726,30 @@ export class contentController {
   }
 
   @ApiExcludeEndpoint(true)
-  @Get('/getContentWord')
-  async getContentWord(
-    @Res() response: FastifyReply,
-    @Query('language') language,
-    @Query() { limit = 5 },
-  ) {
-    try {
-      const Batch: any = limit;
-      const { data } = await this.contentService.getContentWord(
-        parseInt(Batch),
-        language,
-      );
-      return response.status(HttpStatus.OK).send({ status: 'success', data });
-    } catch (error) {
-      return response.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
-        status: 'error',
-        message: 'Server error - ' + error,
-      });
-    }
+@Get('/getContentWord')
+async getContentWord(
+  @Res() response: FastifyReply,
+  @Query('language') language: string,
+  @Query('limit') limit: number = 5,
+  @Query('multilingual') multilingual: string,
+) {
+  try {
+    const includeMultilingual = multilingual === 'true';
+
+    const { data } = await this.contentService.getContentWord(
+      limit,
+      language,
+      includeMultilingual,
+    );
+
+    return response.status(HttpStatus.OK).send({ status: 'success', data });
+  } catch (error) {
+    return response.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+      status: 'error',
+      message: 'Server error - ' + error,
+    });
   }
+}
 
   @ApiExcludeEndpoint(true)
   @Get('/getContentSentence')

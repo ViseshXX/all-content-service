@@ -11,7 +11,7 @@ export class contentService {
   constructor(
     @InjectModel(content.name) private content: Model<contentDocument>,
     private readonly httpService: HttpService,
-  ) {}
+  ) { }
 
   async create(content: content): Promise<content> {
     try {
@@ -109,8 +109,8 @@ export class contentService {
     };
   }
 
-  async getContentWord(limit = 5, language = 'ta') {
-    const data = await this.content.aggregate([
+  async getContentWord(limit = 5, language = 'ta', includeMultilingual = false) {
+    const pipeline: any[] = [
       {
         $match: {
           contentType: 'Word',
@@ -122,12 +122,25 @@ export class contentService {
         },
       },
       { $sample: { size: limit } },
-    ]);
+    ];
+
+    // Multilingual check
+    if (!includeMultilingual) {
+      pipeline.push({
+        $project: {
+          multilingual: 0,
+        },
+      });
+    }
+
+    const data = await this.content.aggregate(pipeline);
+
     return {
-      data: data,
+      data,
       status: 200,
     };
   }
+
 
   async getContentSentence(limit = 5, language = 'ta') {
     const data = await this.content.aggregate([
