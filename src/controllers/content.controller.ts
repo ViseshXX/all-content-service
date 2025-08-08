@@ -29,6 +29,7 @@ import {
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/auth/auth.guard';
 import en_config from 'src/config/language/en';
+import common_config from 'src/config/commonConfig';
 
 @ApiTags('content')
 @Controller('content')
@@ -708,30 +709,30 @@ export class contentController {
   }
 
   @ApiExcludeEndpoint(true)
-@Get('/getContentWord')
-async getContentWord(
-  @Res() response: FastifyReply,
-  @Query('language') language: string,
-  @Query('limit') limit: number = 5,
-  @Query('multilingual') multilingual: string,
-) {
-  try {
-    const includeMultilingual = multilingual === 'true';
+  @Get('/getContentWord')
+  async getContentWord(
+    @Res() response: FastifyReply,
+    @Query('language') language: string,
+    @Query('limit') limit: number = 5,
+    @Query('multilingual') multilingual: string,
+  ) {
+    try {
+      const includeMultilingual = multilingual === 'true';
 
-    const { data } = await this.contentService.getContentWord(
-      limit,
-      language,
-      includeMultilingual,
-    );
+      const { data } = await this.contentService.getContentWord(
+        limit,
+        language,
+        includeMultilingual,
+      );
 
-    return response.status(HttpStatus.OK).send({ status: 'success', data });
-  } catch (error) {
-    return response.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
-      status: 'error',
-      message: 'Server error - ' + error,
-    });
+      return response.status(HttpStatus.OK).send({ status: 'success', data });
+    } catch (error) {
+      return response.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+        status: 'error',
+        message: 'Server error - ' + error,
+      });
+    }
   }
-}
 
   @ApiExcludeEndpoint(true)
   @Get('/getContentSentence')
@@ -1043,7 +1044,9 @@ async getContentWord(
       let contentCollection;
       let collectionId;
 
-      if (en_config.tags.some(tag => queryData.tags.some(qtag => qtag.includes(tag)))) {
+      const tags = queryData.language === 'en' ? en_config.tags : common_config.tags;
+     
+      if (tags.some(tag => queryData.tags.some(qtag => qtag.includes(tag)))) {
         queryData.cLevel = "";
         queryData.complexityLevel = "";
         queryData.graphemesMappedObj = {};
@@ -1109,7 +1112,7 @@ async getContentWord(
           queryData.tokenArr,
           queryData.language,
           queryData.contentType,
-          parseInt(Batch),
+          parseInt(Batch.limit || Batch),
           queryData.tags,
           queryData.cLevel,
           queryData.complexityLevel,
@@ -1121,7 +1124,7 @@ async getContentWord(
         contentCollection = await this.contentService.getMechanicsContentData(
           queryData.contentType,
           queryData.mechanics_id,
-          parseInt(Batch),
+          parseInt(Batch.limit || Batch),
           queryData.language,
           queryData.level_competency,
           queryData.tags,
