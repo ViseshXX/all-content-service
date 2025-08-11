@@ -259,7 +259,7 @@ export class contentController {
               syllableCountMap[wordEle] = await getSyllableCount(wordEle);
             }
             if(common_config.readingComplexityLang.includes(contentSourceDataEle['language'])) {
-              const urls = process.env.ALL_TEXT_EVAL_API + 'getReadingComplexity';
+              const urls = process.env.ALL_TEXT_EVAL_URL + 'getReadingComplexity';
               const reqBody = {
                 language: contentLanguage,
                 text: contentSourceDataEle['text'],
