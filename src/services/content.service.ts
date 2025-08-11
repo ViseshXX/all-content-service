@@ -640,7 +640,7 @@ export class contentService {
           return !mileStoneQueryEle.hasOwnProperty('totalOrthoComplexity');
         });
 
-        if (mileStoneQuery != undefined || mileStoneQuery.length != 0) {
+        if (mileStoneQuery != undefined && mileStoneQuery.length != 0) {
           query.contentSourceData.$elemMatch['$or'] = mileStoneQuery;
         }
 
@@ -756,7 +756,9 @@ export class contentService {
           cLevelQuery.push(contentQueryParamEle);
         }
 
-        query.contentSourceData.$elemMatch['$and'] = cLevelQuery;
+        if (cLevelQuery.length > 0) {
+          query.contentSourceData.$elemMatch['$and'] = cLevelQuery;
+        }
 
         await this.content
           .aggregate([
