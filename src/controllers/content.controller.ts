@@ -210,7 +210,6 @@ export class contentController {
             }
 
             const url = process.env.ALL_LC_API_URL + contentLanguage;
-            console.log("ALL_LC_API_URL------", url);
             const textData = {
               request: {
                 language_id: contentLanguage,
@@ -259,11 +258,12 @@ export class contentController {
             for (const wordEle of contentSourceDataEle['text'].split(' ')) {
               syllableCountMap[wordEle] = await getSyllableCount(wordEle);
             }
-            if(common_config.readingComplexityLang.includes(contentSourceDataEle['language'])) {
+            if (common_config.readingComplexityLang.includes(contentSourceDataEle['language'])) {
+              
               const urls = process.env.ALL_TEXT_EVAL_URL + 'getReadingComplexity';
-              console.log("ALL_TEXT_EVAL_URL-1-------", urls);
+
               const reqBody = {
-                language: contentLanguage,
+                language: contentSourceDataEle['language'],
                 text: contentSourceDataEle['text'],
               };
               const readingComplexity = await lastValueFrom(
@@ -288,7 +288,7 @@ export class contentController {
             };
           } else if (contentSourceDataEle['language'] === 'en') {
             const url = process.env.ALL_TEXT_EVAL_URL + 'getPhonemes';
-            console.log("ALL_TEXT_EVAL_URL--2--------", url);
+
             const textData = {
               text: contentSourceDataEle['text'],
             };
@@ -1065,7 +1065,7 @@ export class contentController {
       let collectionId;
 
       const tags = queryData.language === 'en' ? en_config.tags : common_config.tags;
-     
+
       if (tags.some(tag => queryData.tags.some(qtag => qtag.includes(tag)))) {
         queryData.cLevel = "";
         queryData.complexityLevel = "";
