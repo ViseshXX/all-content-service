@@ -210,6 +210,7 @@ export class contentController {
             }
 
             const url = process.env.ALL_LC_API_URL + contentLanguage;
+            console.log("ALL_LC_API_URL------", url);
             const textData = {
               request: {
                 language_id: contentLanguage,
@@ -260,6 +261,7 @@ export class contentController {
             }
             if(common_config.readingComplexityLang.includes(contentSourceDataEle['language'])) {
               const urls = process.env.ALL_TEXT_EVAL_URL + 'getReadingComplexity';
+              console.log("ALL_TEXT_EVAL_URL-1-------", urls);
               const reqBody = {
                 language: contentLanguage,
                 text: contentSourceDataEle['text'],
@@ -286,6 +288,7 @@ export class contentController {
             };
           } else if (contentSourceDataEle['language'] === 'en') {
             const url = process.env.ALL_TEXT_EVAL_URL + 'getPhonemes';
+            console.log("ALL_TEXT_EVAL_URL--2--------", url);
             const textData = {
               text: contentSourceDataEle['text'],
             };
