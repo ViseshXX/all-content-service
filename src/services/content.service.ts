@@ -359,7 +359,10 @@ export class contentService {
       nextTokenArr = tokenArr.slice(limit, tokenArr.length);
     }
     tokenArr = tokenArr.slice(0, limit);
-
+    const isCommonConfigTags = tags && Array.isArray(tags) && tags.some(tag => 
+      common_config.tags.includes(tag)
+    );
+    
     if (language !== 'en') {
       let mileStoneQuery = [];
       let cLevelQuery = [];
@@ -441,8 +444,7 @@ export class contentService {
       const inBetweenRegexPattern = new RegExp(`\\B(${searchChar})`, 'gu');
 
       let batchLimitForEndWith = Math.trunc(limit / 2);
-      const batchLimitForStartWith = (limit % 2) + batchLimitForEndWith;
-
+      const batchLimitForStartWith = isCommonConfigTags ? limit : (limit % 2) + batchLimitForEndWith;
       let wordsArr = [];
       let query: any = {};
       let contentData = [];
