@@ -1,3 +1,11 @@
+function generateSequentialTags(prefix, start, end) {
+  const tags = [];
+  for (let i = start; i <= end; i++) {
+    tags.push(prefix + i);
+  }
+  return tags;
+}
+
 var common_config = {
   contentLevel: [
     {
@@ -241,36 +249,8 @@ var common_config = {
     'CEFR_M3_P4',
     'CEFR_M3_S1',
     'CEFR_M3_S2',
-    'CEFR_R1_P1',
-    'CEFR_R1_P2',
-    'CEFR_R1_P3',
-    'CEFR_R1_P4',
-    'CEFR_R1_P5',
-    'CEFR_R1_P6',
-    'CEFR_R1_P7',
-    'CEFR_R1_P8',
-    'CEFR_R1_P9',
-    'CEFR_R1_P10',
-    'CEFR_R1_P11',
-    'CEFR_R1_P12',
-    'CEFR_R1_P13',
-    'CEFR_R1_P14',
-    'CEFR_R1_P15',
-    'CEFR_R2_P1',
-    'CEFR_R2_P2',
-    'CEFR_R2_P3',
-    'CEFR_R2_P4',
-    'CEFR_R2_P5',
-    'CEFR_R2_P6',
-    'CEFR_R2_P7',
-    'CEFR_R2_P8',
-    'CEFR_R2_P9',
-    'CEFR_R2_P10',
-    'CEFR_R2_P11',
-    'CEFR_R2_P12',
-    'CEFR_R2_P13',
-    'CEFR_R2_P14',
-    'CEFR_R2_P15',
+    ...generateSequentialTags('CEFR_R1_P', 1, 50),
+    ...generateSequentialTags('CEFR_R2_P', 1, 50),
     'CEFR_M1_L1',
     'CEFR_M1_L2',
     'CEFR_M1_L3',
