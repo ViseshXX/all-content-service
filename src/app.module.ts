@@ -4,6 +4,7 @@ import { AppService } from './app.service';
 import { MongooseModule } from '@nestjs/mongoose';
 import { content, contentSchema } from 'src/schemas/content.schema';
 import { collection, collectionDbSchema } from './schemas/collection.schema';
+import { multilingual, multilingualSchema } from './schemas/multilingual.schema';
 import { contentService } from 'src/services/content.service';
 import { contentController } from 'src/controllers/content.controller';
 import { ConfigModule } from '@nestjs/config';
@@ -36,6 +37,7 @@ import { AuthModule } from './auth/auth.module';
     MongooseModule.forFeature([
       { name: content.name, schema: contentSchema },
       { name: collection.name, schema: collectionDbSchema },
+      { name: multilingual.name, schema: multilingualSchema },
     ]),
     AuthModule
   ],
