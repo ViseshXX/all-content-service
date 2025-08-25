@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { content, contentDocument } from '../schemas/content.schema';
+import { multilingual, multilingualDocument } from '../schemas/multilingual.schema';
 import { HttpService } from '@nestjs/axios';
 import en_config from 'src/config/language/en';
 import common_config from 'src/config/commonConfig';
@@ -10,6 +11,7 @@ import common_config from 'src/config/commonConfig';
 export class contentService {
   constructor(
     @InjectModel(content.name) private content: Model<contentDocument>,
+    @InjectModel(multilingual.name) private multilingual: Model<multilingualDocument>,
     private readonly httpService: HttpService,
   ) { }
 
@@ -136,7 +138,7 @@ export class contentService {
     const data = await this.content.aggregate(pipeline);
 
     return {
-      data,
+      data: data,
       status: 200,
     };
   }
@@ -2204,5 +2206,26 @@ export class contentService {
     });
 
     return { wordsArr: wordsArr };
+  }
+
+  // Multilingual Service Method
+  async createMultilingual(multilingualData: multilingual): Promise<multilingual> {
+    try {
+      const newMultilingual = new this.multilingual(multilingualData);
+      const savedData = await newMultilingual.save();
+      return savedData;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async getMultilingualDataByIds(multilingualIds: string[]): Promise<multilingual[]> {
+    try {
+      return await this.multilingual.find({
+        multilingual_id: { $in: multilingualIds }
+      }).exec();
+    } catch (error) {
+      throw error;
+    }
   }
 }

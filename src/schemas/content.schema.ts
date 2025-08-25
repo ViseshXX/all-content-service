@@ -75,6 +75,7 @@ export class content {
       words?: [string];
       imageAudioMap?: [{
         text: string,
+        multilingual_id:string,
         audio_url: string,
         image_url: string,
       }];

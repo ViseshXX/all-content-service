@@ -1152,6 +1152,42 @@ export class contentController {
         );
       }
 
+      // Enhance data with multilingual information for imageAudioMap
+      if (contentCollection?.wordsArr?.length > 0) {
+        const enhancedWordsArr = await Promise.all(
+          contentCollection.wordsArr.map(async (item) => {
+            if (item.mechanics_data?.length > 0) {
+              for (const mechanic of item.mechanics_data) {
+                if (mechanic.imageAudioMap?.length > 0) {
+                  const multilingualIds = [...new Set(
+                    mechanic.imageAudioMap
+                      .filter(mapItem => mapItem.multilingual_id)
+                      .map(mapItem => mapItem.multilingual_id)
+                  )];
+
+                  if (multilingualIds.length > 0) {
+                    const multilingualData = await this.contentService.getMultilingualDataByIds(multilingualIds as string[]);
+                    const multilingualMap = {};
+                    multilingualData.forEach(ml => {
+                      multilingualMap[ml.multilingual_id] = ml.multilingual;
+                    });
+
+                    mechanic.imageAudioMap = mechanic.imageAudioMap.map(mapItem => ({
+                      ...mapItem,
+                      multilingual_data: mapItem.multilingual_id ? 
+                        multilingualMap[mapItem.multilingual_id] || null : null
+                    }));
+                  }
+                }
+              }
+            }
+            return item;
+          })
+        );
+
+        contentCollection.wordsArr = enhancedWordsArr;
+      }
+
       return response.status(HttpStatus.CREATED).send({
         status: 'success',
         data: contentCollection,
@@ -1532,5 +1568,62 @@ export class contentController {
     return response.status(HttpStatus.OK).send({
       deleted,
     });
+  }
+
+  // Multilingual API
+  @ApiBody({
+    description: 'Request body for creating multilingual data',
+    schema: {
+      type: 'object',
+      properties: {
+        multilingual_id: {
+          type: 'string',
+          example: 'TEACHER',
+          description: 'Unique identifier for the multilingual entry'
+        },
+        multilingual: {
+          type: 'object',
+          description: 'Language-specific data',
+          example: {
+            hi: { text: 'शिक्षक', audio_url: 'c8eff92d5.wav' },
+            gu: { text: 'શિક્ષક', audio_url: 'b6c0f542e.wav' },
+            kn: { text: 'ಶಿಕ್ಷಕ', audio_url: '0d234f9c3.wav' }
+          }
+        }
+      },
+      required: ['multilingual_id', 'multilingual']
+    }
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Multilingual data created successfully'
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request - Invalid data provided'
+  })
+  @ApiResponse({
+    status: 500,
+    description: 'Internal server error'
+  })
+  @ApiOperation({
+    summary: 'Create new multilingual data',
+    description: 'Add a new multilingual entry with text and audio for different languages'
+  })
+  @Post('/multilingual')
+  async createMultilingual(@Res() response: FastifyReply, @Body() multilingualData: any) {
+    try {
+      const newMultilingual = await this.contentService.createMultilingual(multilingualData);
+      
+      return response.status(HttpStatus.CREATED).send({
+        status: 'success',
+        data: newMultilingual
+      });
+    } catch (error) {
+      return response.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+        status: 'error',
+        message: 'Server error - ' + error.message
+      });
+    }
   }
 }
