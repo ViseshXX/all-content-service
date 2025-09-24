@@ -8,7 +8,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: staging         
+    environment: staging
     steps:
       - name: Deploy to Staging Server
         uses: appleboy/ssh-action@v0.1.10
@@ -19,5 +19,5 @@ jobs:
           port: ${{ secrets.PORT }}
           script: |
             export BRANCH=lais-v2.2
-            cd /home/all-staging-user/all-services/all-content-deploy
+            cd /home/${{ secrets.USERNAME }}/all-services/all-content-service-deploy
             ./deploy.sh
