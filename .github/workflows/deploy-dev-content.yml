@@ -19,5 +19,5 @@ jobs:
           port: ${{ secrets.PORT }}
           script: |
             export BRANCH=lais-v2.2
-            cd /home/${{ secrets.USERNAME }}/git/all-content-service-deploy
+            cd /home/sudeepr/git/all-content-service
             ./deploy.sh
