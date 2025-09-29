@@ -22,7 +22,6 @@ import {
   ApiExcludeEndpoint,
   ApiForbiddenResponse,
   ApiOperation,
-  ApiParam,
   ApiResponse,
   ApiTags,
   ApiQuery,
@@ -1060,7 +1059,6 @@ export class contentController {
   async getContent(@Res() response: FastifyReply, @Body() queryData: any) {
     try {
       const Batch: any = queryData.limit || 5;
-
       let contentCollection;
       let collectionId;
 
@@ -1156,20 +1154,23 @@ export class contentController {
       if (contentCollection?.wordsArr?.length > 0) {
         const enhancedWordsArr = await Promise.all(
           contentCollection.wordsArr.map(async (item) => {
+            // Handle mechanics_data multilingual enhancement (existing functionality)
             if (item.mechanics_data?.length > 0) {
               for (const mechanic of item.mechanics_data) {
-                if (mechanic.imageAudioMap?.length > 0) {
+                if (mechanic && mechanic.imageAudioMap?.length > 0) {
                   const multilingualIds = [...new Set(
                     mechanic.imageAudioMap
-                      .filter(mapItem => mapItem.multilingual_id)
+                      .filter(mapItem => mapItem && mapItem.multilingual_id)
                       .map(mapItem => mapItem.multilingual_id)
                   )];
 
                   if (multilingualIds.length > 0) {
                     const multilingualData = await this.contentService.getMultilingualDataByIds(multilingualIds as string[]);
                     const multilingualMap = {};
-                    multilingualData.forEach(ml => {
-                      multilingualMap[ml.multilingual_id] = ml.multilingual;
+                    multilingualData?.forEach(ml => {
+                      if (ml && ml.multilingual_id) {
+                        multilingualMap[ml.multilingual_id] = ml.multilingual;
+                      }
                     });
 
                     mechanic.imageAudioMap = mechanic.imageAudioMap.map(mapItem => ({
@@ -1181,6 +1182,31 @@ export class contentController {
                 }
               }
             }
+
+            // Handle contentSourceData multilingual
+            if ((queryData.multilingual === 'true' ||queryData.multilingual === true) && item.contentSourceData?.length > 0) {
+              let multilingualData = {};
+              
+              // Find the contentSourceData for the requested language
+              const sourceData = item.contentSourceData.find(
+                (source) => source.language === queryData.language
+              );
+              
+              if (sourceData?.multilingual_id && Array.isArray(sourceData.multilingual_id)) {
+                // Fetch multilingual data for all multilingual_ids at once
+                const multilingualDocs = await this.contentService.getMultilingualDataByIds(sourceData.multilingual_id);
+                
+                // Structure the multilingual data
+                multilingualDocs?.forEach((doc) => {
+                  if (doc) {
+                    multilingualData[doc.multilingual_id] = doc.multilingual;
+                  }
+                });
+              }
+              
+              item.multilingual_data = multilingualData;
+            }
+
             return item;
           })
         );

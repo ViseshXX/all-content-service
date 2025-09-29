@@ -2219,10 +2219,13 @@ export class contentService {
     }
   }
 
-  async getMultilingualDataByIds(multilingualIds: string[]): Promise<multilingual[]> {
+  async getMultilingualDataByIds(multilingualIds: string | string[]): Promise<multilingual[]> {
     try {
+      // Convert single string to array for consistent handling
+      const idsArray = Array.isArray(multilingualIds) ? multilingualIds : [multilingualIds];
+      
       return await this.multilingual.find({
-        multilingual_id: { $in: multilingualIds }
+        multilingual_id: { $in: idsArray }
       }).exec();
     } catch (error) {
       throw error;
