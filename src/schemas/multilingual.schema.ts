@@ -17,6 +17,7 @@ export class multilingual {
     [langCode: string]: {
       text: string;
       audio_url: string;
+      image_url:string
     };
   };
 
