@@ -10,20 +10,17 @@ export class multilingual {
   @Prop({ type: String, required: true, index: true })
   @IsString()
   multilingual_id: string;
-
-  @Prop({ type: String, required: false, index: true })
-  @IsString()
-  content_id: string;
+  
   
   @Prop({ type: Object, required: true })
   @IsObject()
   multilingual: {
-    [langCode: string]: {
-      text: string;
-      audio_url: string;
-      image_url:string
-    };
-  };
+    content_id: string;
+  } & Record<string, {
+    text: string;
+    audio_url: string;
+    image_url: string;
+  }>;
 
   @Prop({ default: now(), index: true })
   createdAt: Date;
