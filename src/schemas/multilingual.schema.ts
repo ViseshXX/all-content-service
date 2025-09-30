@@ -11,6 +11,10 @@ export class multilingual {
   @IsString()
   multilingual_id: string;
 
+  @Prop({ type: String, required: false, index: true })
+  @IsString()
+  content_id: string;
+  
   @Prop({ type: Object, required: true })
   @IsObject()
   multilingual: {

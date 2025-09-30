@@ -1640,7 +1640,6 @@ export class contentController {
   async createMultilingual(@Res() response: FastifyReply, @Body() multilingualData: any) {
     try {
       const newMultilingual = await this.contentService.createMultilingual(multilingualData);
-      
       return response.status(HttpStatus.CREATED).send({
         status: 'success',
         data: newMultilingual
