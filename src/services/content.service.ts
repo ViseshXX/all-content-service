@@ -346,13 +346,18 @@ export class contentService {
     language = 'ta',
     contentType = 'Word',
     limit = 5,
-    tags = '',
+    tags: string | string[] = '',
     cLevel,
     complexityLevel,
     graphemesMappedObj,
     level_competency = [],
     CEFR_level = [],
   ): Promise<any> {
+    // Convert tags to array format
+    if (typeof tags === 'string') {
+      tags = tags ? tags.split(',').map(tag => tag.trim()) : [];
+    }
+    
     let nextTokenArr = [];
     let readingComplexityLang = common_config.readingComplexityLang;
     if (tokenArr.length >= limit * 2) {
