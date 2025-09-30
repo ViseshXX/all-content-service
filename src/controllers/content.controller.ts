@@ -1139,15 +1139,32 @@ export class contentController {
           queryData.CEFR_level,
         );
       } else {
-        contentCollection = await this.contentService.getMechanicsContentData(
-          queryData.contentType,
-          queryData.mechanics_id,
-          parseInt(Batch.limit || Batch),
-          queryData.language,
-          queryData.level_competency,
-          queryData.tags,
-          queryData.CEFR_level,
-        );
+        // If mechanics_id is provided, use simple tag-based filtering
+        if (queryData.mechanics_id) {
+          contentCollection = await this.contentService.search(
+            [], // empty tokenArr
+            queryData.language,
+            queryData.contentType,
+            parseInt(Batch.limit || Batch),
+            [queryData.mechanics_id], // use mechanics_id as tag filter
+            "", // empty cLevel
+            "", // empty complexityLevel
+            {}, // empty graphemesMappedObj
+            [], // empty level_competency
+            [], // empty CEFR_level
+          );
+        } else {
+          // Fallback to original getMechanicsContentData if no mechanics_id
+          contentCollection = await this.contentService.getMechanicsContentData(
+            queryData.contentType,
+            queryData.mechanics_id,
+            parseInt(Batch.limit || Batch),
+            queryData.language,
+            queryData.level_competency,
+            queryData.tags,
+            queryData.CEFR_level,
+          );
+        }
       }
 
       // Enhance data with multilingual information for imageAudioMap
