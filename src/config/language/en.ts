@@ -101,7 +101,8 @@ var en_config = {
     'CEFR_GEN_M15_P8',
     'CEFR_GEN_M15_S1',
     'CEFR_GEN_M15_S2',
-    'CEFR_GENERAL_ENG-M'
+    'CEFR_GENERAL_ENG-M',
+    'CEFR_GEN_ENG_TB'
   ],
   contentLevel: [
     {
