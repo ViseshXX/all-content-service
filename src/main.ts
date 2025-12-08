@@ -20,16 +20,63 @@ async function bootstrap() {
   app.setGlobalPrefix('v1');
   
   const config = new DocumentBuilder()
-    .setTitle('ALL Content Service')
+    .setTitle('ALL Content Service API')
     .setDescription(
-      'All content service includes Storys , word, sentences texts to practice',
+      `## Overview
+The ALL (Adaptive Learning & Literacy) Content Service provides APIs for managing educational content including words, sentences, paragraphs, and characters in multiple Indian languages.
+
+## Features
+- **Content Management**: Create, read, update, and delete content items with automatic phoneme and complexity analysis
+- **Collection Management**: Organize content into collections by language, category, and tags
+- **Multilingual Support**: Support for English (en), Hindi (hi), Tamil (ta), Kannada (kn), Telugu (te), and Gujarati (gu)
+- **Assessment Support**: Retrieve assessment collections (ASER, NAS) with set-based filtering
+- **Complexity Analysis**: Automatic syllable counting, word frequency, and reading complexity calculation
+
+## Authentication
+All API endpoints (except health check) require JWT Bearer token authentication. Include the token in the Authorization header:
+\`\`\`
+Authorization: Bearer <your-jwt-token>
+\`\`\`
+
+## Content Types
+- **Word**: Individual words with phoneme breakdown
+- **Sentence**: Complete sentences with word analysis
+- **Paragraph**: Multi-sentence content for reading practice
+- **Char**: Individual characters for alphabet learning`,
     )
-    .setVersion('v1')
-    .addServer(process.env.SERVER_URL, 'ALL Content Service Server APIs')
+    .setVersion('1.0.0')
+    .addServer(process.env.SERVER_URL || 'http://localhost:3008', 'ALL Content Service Server')
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        name: 'Authorization',
+        description: 'Enter your JWT token',
+        in: 'header',
+      },
+      'access-token',
+    )
+    .addTag('health', 'Health check and monitoring endpoints')
+    .addTag('content', 'Content management endpoints for words, sentences, paragraphs, and characters')
+    .addTag('collection', 'Collection management endpoints for organizing content')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api', app, document);
+  SwaggerModule.setup('api', app, document, {
+    customSiteTitle: 'ALL Content Service - API Documentation',
+    customfavIcon: 'https://nestjs.com/img/logo-small.svg',
+    swaggerOptions: {
+      persistAuthorization: true,
+      docExpansion: 'none',
+      filter: true,
+      showRequestDuration: true,
+      syntaxHighlight: {
+        activate: true,
+        theme: 'monokai',
+      },
+    },
+  });
 
   // Cors aalowd for the specific url
   const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [];

@@ -18,6 +18,7 @@ import { HttpService } from '@nestjs/axios';
 import { lastValueFrom, map } from 'rxjs';
 import * as splitGraphemes from 'split-graphemes';
 import {
+  ApiBearerAuth,
   ApiBody,
   ApiExcludeEndpoint,
   ApiForbiddenResponse,
@@ -25,12 +26,15 @@ import {
   ApiResponse,
   ApiTags,
   ApiQuery,
+  ApiUnauthorizedResponse,
+  ApiParam,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/auth/auth.guard';
 import en_config from 'src/config/language/en';
 import common_config from 'src/config/commonConfig';
 
 @ApiTags('content')
+@ApiBearerAuth('access-token')
 @Controller('content')
 @UseGuards(JwtAuthGuard)
 export class contentController {
@@ -40,43 +44,53 @@ export class contentController {
     private readonly httpService: HttpService,
   ) { }
 
+  @ApiOperation({
+    summary: 'Create new content',
+    description: 'Create a new content item (word, sentence, paragraph, or character) with automatic phoneme and complexity analysis based on the language',
+  })
   @ApiBody({
-    description: 'Request body for storing the data into the content',
+    description: 'Content data to be created',
     schema: {
       type: 'object',
+      required: ['collectionId', 'name', 'contentType', 'contentSourceData', 'language'],
       properties: {
         collectionId: {
           type: 'string',
+          format: 'uuid',
           example: '3f0192af-0720-4248-b4d4-d99a9f731d4f',
+          description: 'UUID of the parent collection',
         },
-        name: { type: 'string', example: 'tn gr2 eng t1 ch2d' },
-        contentType: { type: 'string', example: 'Sentence' },
+        name: { type: 'string', example: 'tn gr2 eng t1 ch2d', description: 'Name identifier for the content' },
+        contentType: {
+          type: 'string',
+          enum: ['Word', 'Sentence', 'Paragraph', 'Char'],
+          example: 'Sentence',
+          description: 'Type of content',
+        },
         contentSourceData: {
           type: 'array',
+          description: 'Array of content data for different languages',
           items: {
             type: 'object',
             properties: {
-              language: { type: 'string', example: 'en' },
-              audioUrl: { type: 'string', example: '' },
-              text: {
-                type: 'string',
-                example: 'Blue bird, blue bird, what do you see?',
-              },
+              language: { type: 'string', example: 'en', description: 'Language code (en, hi, ta, kn, te, gu)' },
+              audioUrl: { type: 'string', example: '', description: 'URL to audio file (optional)' },
+              text: { type: 'string', example: 'Blue bird, blue bird, what do you see?', description: 'The actual text content' },
             },
           },
         },
-        status: { type: 'string', example: 'live' },
-        publisher: { type: 'string', example: 'ekstep' },
-        language: { type: 'string', example: 'en' },
-        contentIndex: { type: 'number', example: 1 },
-        tags: { type: 'array', items: { type: 'string' }, example: [] },
-        imagePath: { type: 'string', example: 'image_2.jpg' },
+        status: { type: 'string', enum: ['live', 'draft'], example: 'live', description: 'Publication status' },
+        publisher: { type: 'string', example: 'ekstep', description: 'Publisher name' },
+        language: { type: 'string', example: 'en', description: 'Primary language code' },
+        contentIndex: { type: 'number', example: 1, description: 'Index position in the collection' },
+        tags: { type: 'array', items: { type: 'string' }, example: [], description: 'Tags for categorization' },
+        imagePath: { type: 'string', example: 'image_2.jpg', description: 'Path to associated image (optional)' },
       },
     },
   })
   @ApiResponse({
     status: 201,
-    description: 'The content item has been successfully created.',
+    description: 'Content created successfully with computed phonemes, word count, and syllable analysis',
     schema: {
       type: 'object',
       properties: {
@@ -84,10 +98,7 @@ export class contentController {
         data: {
           type: 'object',
           properties: {
-            collectionId: {
-              type: 'string',
-              example: '3f0192af-0720-4248-b4d4-d99a9f731d4f',
-            },
+            collectionId: { type: 'string', format: 'uuid', example: '3f0192af-0720-4248-b4d4-d99a9f731d4f' },
             name: { type: 'string', example: 'tn gr2 eng t1 ch2d' },
             contentType: { type: 'string', example: 'Sentence' },
             imagePath: { type: 'string', example: 'image_2.jpg' },
@@ -98,66 +109,12 @@ export class contentController {
                 properties: {
                   language: { type: 'string', example: 'en' },
                   audioUrl: { type: 'string', example: '' },
-                  text: {
-                    type: 'string',
-                    example: 'Blue bird, blue bird, what do you see?',
-                  },
-                  phonemes: {
-                    type: 'array',
-                    items: { type: 'string' },
-                    example: [
-                      'b',
-                      'l',
-                      'u',
-                      'b',
-                      'ə',
-                      'r',
-                      'd',
-                      ',',
-                      'b',
-                      'l',
-                      'u',
-                      'b',
-                      'ə',
-                      'r',
-                      'd',
-                      ',',
-                      'w',
-                      'ə',
-                      't',
-                      'd',
-                      'u',
-                      'j',
-                      'u',
-                      's',
-                      'i',
-                      '?',
-                    ],
-                  },
+                  text: { type: 'string', example: 'Blue bird, blue bird, what do you see?' },
+                  phonemes: { type: 'array', items: { type: 'string' }, example: ['b', 'l', 'u', 'b', 'ə', 'r', 'd'] },
                   wordCount: { type: 'number', example: 8 },
-                  wordFrequency: {
-                    type: 'object',
-                    example: {
-                      blue: 2,
-                      bird: 2,
-                      what: 1,
-                      do: 1,
-                      you: 1,
-                      see: 1,
-                    },
-                  },
+                  wordFrequency: { type: 'object', example: { blue: 2, bird: 2, what: 1, do: 1, you: 1, see: 1 } },
                   syllableCount: { type: 'number', example: 28 },
-                  syllableCountMap: {
-                    type: 'object',
-                    example: {
-                      blue: 4,
-                      bird: 4,
-                      what: 4,
-                      do: 2,
-                      you: 3,
-                      see: 3,
-                    },
-                  },
+                  syllableCountMap: { type: 'object', example: { blue: 4, bird: 4, what: 4, do: 2, you: 3, see: 3 } },
                 },
               },
             },
@@ -166,33 +123,28 @@ export class contentController {
             language: { type: 'string', example: 'en' },
             contentIndex: { type: 'number', example: 1 },
             tags: { type: 'array', items: { type: 'string' }, example: [] },
-            createdAt: { type: 'string', example: '2024-06-07T09:48:00.040Z' },
-            updatedAt: { type: 'string', example: '2024-06-07T09:48:00.040Z' },
+            createdAt: { type: 'string', format: 'date-time', example: '2024-06-07T09:48:00.040Z' },
+            updatedAt: { type: 'string', format: 'date-time', example: '2024-06-07T09:48:00.040Z' },
             _id: { type: 'string', example: '6662d7ff059b133df04db6e3' },
-            contentId: {
-              type: 'string',
-              example: 'fa853c29-bf19-417a-9661-c67d2671ebc1',
-            },
+            contentId: { type: 'string', format: 'uuid', example: 'fa853c29-bf19-417a-9661-c67d2671ebc1' },
             __v: { type: 'number', example: 0 },
           },
         },
       },
     },
   })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized - Invalid or missing JWT token' })
+  @ApiForbiddenResponse({ description: 'Forbidden - Insufficient permissions' })
   @ApiResponse({
     status: 500,
-    description: 'Error while data is being stored to the content table',
+    description: 'Internal server error',
     schema: {
       type: 'object',
       properties: {
         status: { type: 'string', example: 'error' },
-        msg: { type: 'string', example: 'Server error - error message' },
+        message: { type: 'string', example: 'Server error - error message' },
       },
     },
-  })
-  @ApiForbiddenResponse({ description: 'Forbidden.' })
-  @ApiOperation({
-    summary: 'Store the data into to the content table',
   })
   @Post()
   async create(@Res() response: FastifyReply, @Body() content: any) {
@@ -437,27 +389,39 @@ export class contentController {
     }
   }
 
+  @ApiOperation({
+    summary: 'Get paginated content',
+    description: 'Retrieve content items with pagination support, filtered by type and collection ID. Returns content data along with total syllable count.',
+  })
   @ApiQuery({
-    name: 'pagination',
-    description: 'Pagination parameters (page, limit, collectionId)',
-    required: true,
-    schema: {
-      properties: {
-        type: { type: 'string', description: 'content type', example: 'word' },
-        page: { type: 'number', description: 'Page number', example: 1 },
-        limit: { type: 'number', description: 'Items per page', example: 10 },
-        collectionId: {
-          type: 'string',
-          description: 'ID of the collection',
-          example: '3f0192af-0720-4248-b4d4-d99a9f731d4f',
-        },
-      },
-    },
+    name: 'type',
+    description: 'Content type to filter (Word, Sentence, Paragraph, Char)',
+    required: false,
+    example: 'Word',
+  })
+  @ApiQuery({
+    name: 'collectionId',
+    description: 'UUID of the collection to filter content',
+    required: false,
+    example: '3f0192af-0720-4248-b4d4-d99a9f731d4f',
+  })
+  @ApiQuery({
+    name: 'page',
+    description: 'Page number (starts from 1)',
+    required: false,
+    example: 1,
+    type: Number,
+  })
+  @ApiQuery({
+    name: 'limit',
+    description: 'Number of items per page (min: 5, max: 20)',
+    required: false,
+    example: 10,
+    type: Number,
   })
   @ApiResponse({
     status: 200,
-    description:
-      'The content is search by using the collection id limit and page criteria',
+    description: 'Paginated content retrieved successfully',
     schema: {
       type: 'object',
       properties: {
@@ -474,47 +438,32 @@ export class contentController {
                 items: {
                   type: 'object',
                   properties: {
-                    text: {
-                      type: 'string',
-                      example: 'Blue bird, blue bird, what do you see?',
-                    },
-                    phonemes: {
-                      type: 'array',
-                      items: {
-                        type: 'string',
-                        example: ['b', 'l', 'u', 'b', 'ə', 'r'],
-                      },
-                    },
+                    text: { type: 'string', example: 'Blue bird, blue bird, what do you see?' },
+                    phonemes: { type: 'array', items: { type: 'string' }, example: ['b', 'l', 'u', 'b', 'ə', 'r'] },
                     syllableCount: { type: 'number', example: 28 },
                   },
                 },
               },
               language: { type: 'string', example: 'en' },
-              contentId: {
-                type: 'string',
-                example: 'fa853c29-bf19-417a-9661-c67d2671ebc1',
-              },
+              contentId: { type: 'string', format: 'uuid', example: 'fa853c29-bf19-417a-9661-c67d2671ebc1' },
             },
           },
         },
-        totalSyllableCount: { type: 'number', example: 26 },
+        totalSyllableCount: { type: 'number', example: 26, description: 'Total syllable count across all returned content' },
       },
     },
   })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized - Invalid or missing JWT token' })
   @ApiResponse({
     status: 500,
-    description: 'Error while data is being stored to the content table',
+    description: 'Internal server error',
     schema: {
       type: 'object',
       properties: {
         status: { type: 'string', example: 'error' },
-        msg: { type: 'string', example: 'Server error - error message' },
+        message: { type: 'string', example: 'Server error - error message' },
       },
     },
-  })
-  @ApiOperation({
-    summary:
-      'Get the content data with the collection id with pageNo and limit',
   })
   @Get('/pagination')
   async pagination(
@@ -565,21 +514,32 @@ export class contentController {
     }
   }
 
+  @ApiOperation({
+    summary: 'Get random content',
+    description: 'Retrieve a random set of content items filtered by type and language. Useful for generating practice exercises.',
+  })
   @ApiQuery({
-    name: 'pagination',
-    description: 'Pagination parameters (page, limit, collectionId)',
+    name: 'type',
+    description: 'Content type to filter (Word, Sentence, Paragraph, Char)',
     required: true,
-    schema: {
-      properties: {
-        type: { type: 'string', description: 'content type', example: 'word' },
-        language: { type: 'number', description: 'Page number', example: 1 },
-        limit: { type: 'number', description: 'Items per page', example: 10 },
-      },
-    },
+    example: 'Word',
+  })
+  @ApiQuery({
+    name: 'language',
+    description: 'Language code to filter content (en, hi, ta, kn, te, gu)',
+    required: true,
+    example: 'en',
+  })
+  @ApiQuery({
+    name: 'limit',
+    description: 'Number of random items to retrieve',
+    required: false,
+    example: 5,
+    type: Number,
   })
   @ApiResponse({
     status: 200,
-    description: 'The paginated content data has been successfully retrieved.',
+    description: 'Random content retrieved successfully',
     schema: {
       type: 'object',
       properties: {
@@ -590,10 +550,7 @@ export class contentController {
             type: 'object',
             properties: {
               _id: { type: 'string', example: '6662d7ff059b133df04db6e3' },
-              collectionId: {
-                type: 'string',
-                example: '3f0192af-0720-4248-b4d4-d99a9f731d4f',
-              },
+              collectionId: { type: 'string', format: 'uuid', example: '3f0192af-0720-4248-b4d4-d99a9f731d4f' },
               name: { type: 'string', example: 'tn gr2 eng t1 ch2d' },
               contentType: { type: 'string', example: 'Sentence' },
               imagePath: { type: 'string', example: 'image_2.jpg' },
@@ -604,68 +561,12 @@ export class contentController {
                   properties: {
                     language: { type: 'string', example: 'en' },
                     audioUrl: { type: 'string', example: '' },
-                    text: {
-                      type: 'string',
-                      example: 'Blue bird, blue bird, what do you see?',
-                    },
-                    phonemes: {
-                      type: 'array',
-                      items: {
-                        type: 'string',
-                        example: [
-                          'b',
-                          'l',
-                          'u',
-                          'b',
-                          'ə',
-                          'r',
-                          'd',
-                          ',',
-                          'b',
-                          'l',
-                          'u',
-                          'b',
-                          'ə',
-                          'r',
-                          'd',
-                          ',',
-                          'w',
-                          'ə',
-                          't',
-                          'd',
-                          'u',
-                          'j',
-                          'u',
-                          's',
-                          'i',
-                          '?',
-                        ],
-                      },
-                    },
+                    text: { type: 'string', example: 'Blue bird, blue bird, what do you see?' },
+                    phonemes: { type: 'array', items: { type: 'string' }, example: ['b', 'l', 'u', 'b', 'ə', 'r', 'd'] },
                     wordCount: { type: 'number', example: 8 },
-                    wordFrequency: {
-                      type: 'object',
-                      example: {
-                        blue: 2,
-                        bird: 2,
-                        what: 1,
-                        do: 1,
-                        you: 1,
-                        see: 1,
-                      },
-                    },
+                    wordFrequency: { type: 'object', example: { blue: 2, bird: 2, what: 1 } },
                     syllableCount: { type: 'number', example: 28 },
-                    syllableCountMap: {
-                      type: 'object',
-                      example: {
-                        blue: 4,
-                        bird: 4,
-                        what: 4,
-                        do: 2,
-                        you: 3,
-                        see: 3,
-                      },
-                    },
+                    syllableCountMap: { type: 'object', example: { blue: 4, bird: 4 } },
                   },
                 },
               },
@@ -674,18 +575,9 @@ export class contentController {
               language: { type: 'string', example: 'en' },
               contentIndex: { type: 'number', example: 1 },
               tags: { type: 'array', items: { type: 'string' }, example: [] },
-              createdAt: {
-                type: 'string',
-                example: '2024-06-07T09:48:00.040Z',
-              },
-              updatedAt: {
-                type: 'string',
-                example: '2024-06-07T09:48:00.040Z',
-              },
-              contentId: {
-                type: 'string',
-                example: 'fa853c29-bf19-417a-9661-c67d2671ebc1',
-              },
+              createdAt: { type: 'string', format: 'date-time', example: '2024-06-07T09:48:00.040Z' },
+              updatedAt: { type: 'string', format: 'date-time', example: '2024-06-07T09:48:00.040Z' },
+              contentId: { type: 'string', format: 'uuid', example: 'fa853c29-bf19-417a-9661-c67d2671ebc1' },
               __v: { type: 'number', example: 0 },
             },
           },
@@ -693,14 +585,15 @@ export class contentController {
       },
     },
   })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized - Invalid or missing JWT token' })
   @ApiResponse({
     status: 500,
-    description: 'Error while data is being stored to the content table',
+    description: 'Internal server error',
     schema: {
       type: 'object',
       properties: {
         status: { type: 'string', example: 'error' },
-        msg: { type: 'string', example: 'Server error - error message' },
+        message: { type: 'string', example: 'Server error - error message' },
       },
     },
   })
@@ -797,67 +690,89 @@ export class contentController {
     }
   }
 
+  @ApiOperation({
+    summary: 'Search and get content',
+    description: 'Advanced content search with token-based filtering, complexity levels, competency levels, and grapheme mapping support. Returns matched content with syllable analysis.',
+  })
   @ApiBody({
-    description: 'Request body parameters for get content',
+    description: 'Search parameters for content retrieval',
     required: true,
     schema: {
       type: 'object',
       properties: {
         tokenArr: {
           type: 'array',
-          description: 'Array of tokens',
-          items: {
-            type: 'string',
-            example: 'c',
-          },
+          description: 'Array of phoneme/grapheme tokens to search for',
+          items: { type: 'string' },
+          example: ['c', 'v', 'n'],
         },
         language: {
           type: 'string',
-          description: 'Language code',
+          description: 'Language code (en, hi, ta, kn, te, gu)',
           example: 'en',
         },
         contentType: {
           type: 'string',
-          description: 'Type of content',
+          enum: ['Word', 'Sentence', 'Paragraph', 'Char'],
+          description: 'Type of content to retrieve',
           example: 'Word',
         },
         limit: {
           type: 'number',
-          description: 'Limit on the number of items',
+          description: 'Maximum number of items to return',
           example: 5,
         },
         cLevel: {
           type: 'string',
-          description: 'Content level',
+          description: 'Content level (L1, L2, L3, etc.)',
           example: 'L2',
         },
         complexityLevel: {
           type: 'array',
-          description: 'Array of complexity levels',
-          items: {
-            type: 'string',
-            example: 'C1',
-          },
+          description: 'Array of complexity levels to filter (C1, C2, C3)',
+          items: { type: 'string' },
+          example: ['C1', 'C2'],
+        },
+        tags: {
+          type: 'array',
+          description: 'Tags to filter content',
+          items: { type: 'string' },
+          example: ['ASER'],
+        },
+        story_mode: {
+          type: 'string',
+          description: 'Enable story mode for competency-based filtering',
+          example: 'true',
+        },
+        level_competency: {
+          type: 'array',
+          description: 'Competency levels for filtering',
+          items: { type: 'string' },
+          example: [],
+        },
+        CEFR_level: {
+          type: 'string',
+          description: 'CEFR proficiency level',
+          example: 'A1',
+        },
+        mechanics_id: {
+          type: 'string',
+          description: 'Filter by specific mechanics ID',
+          example: 'mech_001',
+        },
+        multilingual: {
+          type: 'string',
+          description: 'Include multilingual data (true/false)',
+          example: 'true',
         },
         graphemesMappedObj: {
           type: 'object',
-          description: 'Object mapping graphemes to their representations',
-          additionalProperties: {
-            type: 'array',
-            items: {
-              type: 'string',
-              example: 'ch',
-            },
-          },
+          description: 'Mapping of phonemes to grapheme representations',
           example: {
             c: ['ch'],
-            o: ['o'],
-            a: ['a'],
             v: ['v', 've'],
             w: ['w', 'wh'],
             æ: ['a', 'ai', 'au'],
-            n: ['n'],
-            i: ['i'],
             θ: ['th'],
           },
         },
@@ -1043,18 +958,16 @@ export class contentController {
   })
   @ApiResponse({
     status: 500,
-    description: 'Error while fetching data from the content table',
+    description: 'Internal server error',
     schema: {
       type: 'object',
       properties: {
         status: { type: 'string', example: 'error' },
-        msg: { type: 'string', example: 'Server error - error message' },
+        message: { type: 'string', example: 'Server error - error message' },
       },
     },
   })
-  @ApiOperation({
-    summary: 'Get all data from the content table',
-  })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized - Invalid or missing JWT token' })
   @Post('/getContent')
   async getContent(@Res() response: FastifyReply, @Body() queryData: any) {
     try {
@@ -1263,23 +1176,26 @@ export class contentController {
     }
   }
 
+  @ApiOperation({
+    summary: 'Get assessment collections',
+    description: 'Retrieve assessment collections filtered by tags and language. For ASER assessments, returns collections across all 5 sets.',
+  })
   @ApiBody({
-    description: 'Request body parameters',
+    description: 'Assessment filter parameters',
     required: true,
     schema: {
       type: 'object',
+      required: ['tags', 'language'],
       properties: {
         tags: {
           type: 'array',
-          description: 'Array of tags',
-          items: {
-            type: 'string',
-            example: 'ASER',
-          },
+          description: 'Array of assessment tags (e.g., ASER, NAS)',
+          items: { type: 'string' },
+          example: ['ASER'],
         },
         language: {
           type: 'string',
-          description: 'Language code',
+          description: 'Language code (en, hi, ta, kn, te, gu)',
           example: 'ta',
         },
       },
@@ -1287,7 +1203,7 @@ export class contentController {
   })
   @ApiResponse({
     status: 200,
-    description: 'Successful response',
+    description: 'Assessment collections retrieved successfully',
     schema: {
       type: 'object',
       properties: {
@@ -1299,10 +1215,7 @@ export class contentController {
               _id: { type: 'string', example: '65e88b6cdee499a6209e739e' },
               name: { type: 'string', example: '(மாதிறி -4)எழுத்து' },
               category: { type: 'string', example: 'Char' },
-              collectionId: {
-                type: 'string',
-                example: 'ed47eb63-87c8-41f4-821d-1400fef37b78',
-              },
+              collectionId: { type: 'string', format: 'uuid', example: 'ed47eb63-87c8-41f4-821d-1400fef37b78' },
             },
           },
         },
@@ -1310,19 +1223,17 @@ export class contentController {
       },
     },
   })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized - Invalid or missing JWT token' })
   @ApiResponse({
     status: 500,
-    description: 'Error while get the data from the content',
+    description: 'Internal server error',
     schema: {
       type: 'object',
       properties: {
         status: { type: 'string', example: 'error' },
-        msg: { type: 'string', example: 'Server error - error message' },
+        message: { type: 'string', example: 'Server error - error message' },
       },
     },
-  })
-  @ApiOperation({
-    summary: 'Get Assessments data',
   })
   @Post('/getAssessment')
   async getAssessment(@Res() response: FastifyReply, @Body() queryData: any) {
@@ -1596,45 +1507,91 @@ export class contentController {
     });
   }
 
-  // Multilingual API
+  @ApiOperation({
+    summary: 'Create multilingual data',
+    description: 'Create a new multilingual entry with text and audio translations for different languages. Used to store translated content for words and phrases.',
+  })
   @ApiBody({
-    description: 'Request body for creating multilingual data',
+    description: 'Multilingual data to be created',
     schema: {
       type: 'object',
+      required: ['multilingual_id', 'multilingual'],
       properties: {
         multilingual_id: {
           type: 'string',
           example: 'TEACHER',
-          description: 'Unique identifier for the multilingual entry'
+          description: 'Unique identifier for the multilingual entry (typically the English word in uppercase)',
         },
         multilingual: {
           type: 'object',
-          description: 'Language-specific data',
+          description: 'Language-specific translations with text and audio URL',
+          additionalProperties: {
+            type: 'object',
+            properties: {
+              text: { type: 'string', description: 'Translated text in the target language' },
+              audio_url: { type: 'string', description: 'Path or URL to the audio file' },
+            },
+          },
           example: {
             hi: { text: 'शिक्षक', audio_url: 'c8eff92d5.wav' },
             gu: { text: 'શિક્ષક', audio_url: 'b6c0f542e.wav' },
-            kn: { text: 'ಶಿಕ್ಷಕ', audio_url: '0d234f9c3.wav' }
-          }
-        }
+            kn: { text: 'ಶಿಕ್ಷಕ', audio_url: '0d234f9c3.wav' },
+            ta: { text: 'ஆசிரியர்', audio_url: 'd9e234f7a.wav' },
+            te: { text: 'ఉపాధ్యాయుడు', audio_url: 'e1f345g8b.wav' },
+          },
+        },
       },
-      required: ['multilingual_id', 'multilingual']
-    }
+    },
   })
   @ApiResponse({
     status: 201,
-    description: 'Multilingual data created successfully'
+    description: 'Multilingual data created successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        status: { type: 'string', example: 'success' },
+        data: {
+          type: 'object',
+          properties: {
+            _id: { type: 'string', example: '6662d7ff059b133df04db6e3' },
+            multilingual_id: { type: 'string', example: 'TEACHER' },
+            multilingual: {
+              type: 'object',
+              example: {
+                hi: { text: 'शिक्षक', audio_url: 'c8eff92d5.wav' },
+                gu: { text: 'શિક્ષક', audio_url: 'b6c0f542e.wav' },
+                kn: { text: 'ಶಿಕ್ಷಕ', audio_url: '0d234f9c3.wav' },
+              },
+            },
+            createdAt: { type: 'string', format: 'date-time', example: '2024-06-07T09:48:00.040Z' },
+            updatedAt: { type: 'string', format: 'date-time', example: '2024-06-07T09:48:00.040Z' },
+          },
+        },
+      },
+    },
   })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized - Invalid or missing JWT token' })
   @ApiResponse({
     status: 400,
-    description: 'Bad request - Invalid data provided'
+    description: 'Bad request - Invalid data provided',
+    schema: {
+      type: 'object',
+      properties: {
+        status: { type: 'string', example: 'error' },
+        message: { type: 'string', example: 'Invalid multilingual data format' },
+      },
+    },
   })
   @ApiResponse({
     status: 500,
-    description: 'Internal server error'
-  })
-  @ApiOperation({
-    summary: 'Create new multilingual data',
-    description: 'Add a new multilingual entry with text and audio for different languages'
+    description: 'Internal server error',
+    schema: {
+      type: 'object',
+      properties: {
+        status: { type: 'string', example: 'error' },
+        message: { type: 'string', example: 'Server error - error message' },
+      },
+    },
   })
   @Post('/multilingual')
   async createMultilingual(@Res() response: FastifyReply, @Body() multilingualData: any) {
