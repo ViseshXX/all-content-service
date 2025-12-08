@@ -14,6 +14,7 @@ import { collection } from 'src/schemas/collection.schema';
 import { CollectionService } from 'src/services/collection.service';
 import { FastifyReply } from 'fastify';
 import {
+  ApiBearerAuth,
   ApiBody,
   ApiExcludeEndpoint,
   ApiForbiddenResponse,
@@ -21,33 +22,70 @@ import {
   ApiParam,
   ApiResponse,
   ApiTags,
+  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/auth/auth.guard';
 
 @ApiTags('collection')
+@ApiBearerAuth('access-token')
 @Controller('collection')
 @UseGuards(JwtAuthGuard)
 export class CollectionController {
   constructor(private readonly CollectionService: CollectionService) {}
 
+  @ApiOperation({
+    summary: 'Create a new collection',
+    description:
+      'Create a new collection to organize content items. Collections can be used to group words, sentences, paragraphs, or other content types by language, author, or category.',
+  })
   @ApiBody({
-    description: 'Request body for storing data to collection',
+    description: 'Request body for creating a new collection',
     schema: {
       type: 'object',
+      required: ['name', 'category', 'language'],
       properties: {
-        name: { type: 'string', example: 'Teacher-Teacher' },
-        description: { type: 'string', example: 'Teacher-Teacher' },
-        category: { type: 'string', example: 'Word' },
-        author: { type: 'string', example: 'Ekstep' },
-        language: { type: 'string', example: 'kn' },
-        status: { type: 'string', example: 'live' },
-        tags: { type: 'array', items: { type: 'string' }, example: [] },
+        name: {
+          type: 'string',
+          example: 'Teacher-Teacher',
+          description: 'Name of the collection',
+        },
+        description: {
+          type: 'string',
+          example: 'Teacher-Teacher',
+          description: 'Description of the collection',
+        },
+        category: {
+          type: 'string',
+          example: 'Word',
+          description: 'Category of content (Word, Sentence, Paragraph, Char)',
+        },
+        author: {
+          type: 'string',
+          example: 'Ekstep',
+          description: 'Author or publisher of the collection',
+        },
+        language: {
+          type: 'string',
+          example: 'kn',
+          description: 'Language code (en, hi, ta, kn, te, gu)',
+        },
+        status: {
+          type: 'string',
+          example: 'live',
+          description: 'Status of the collection (live, draft)',
+        },
+        tags: {
+          type: 'array',
+          items: { type: 'string' },
+          example: ['ASER', 'set1'],
+          description: 'Tags for filtering and categorization',
+        },
       },
     },
   })
   @ApiResponse({
     status: 201,
-    description: 'Success message when data is stored to the collection table',
+    description: 'Collection created successfully',
     schema: {
       type: 'object',
       properties: {
@@ -62,11 +100,12 @@ export class CollectionController {
             language: { type: 'string', example: 'kn' },
             status: { type: 'string', example: 'live' },
             tags: { type: 'array', items: { type: 'string' }, example: [] },
-            createdAt: { type: 'string', example: '2024-06-07T06:14:44.161Z' },
-            updatedAt: { type: 'string', example: '2024-06-07T06:14:44.161Z' },
+            createdAt: { type: 'string', format: 'date-time', example: '2024-06-07T06:14:44.161Z' },
+            updatedAt: { type: 'string', format: 'date-time', example: '2024-06-07T06:14:44.161Z' },
             _id: { type: 'string', example: '6662a5848946f51e15abb9fd' },
             collectionId: {
               type: 'string',
+              format: 'uuid',
               example: '7b762891-8337-46a6-8eb0-abfcdc5c7f35',
             },
             __v: { type: 'number', example: 0 },
@@ -75,21 +114,18 @@ export class CollectionController {
       },
     },
   })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized - Invalid or missing JWT token' })
+  @ApiForbiddenResponse({ description: 'Forbidden - Insufficient permissions' })
   @ApiResponse({
     status: 500,
-    description: 'Error while data is being stored to the collection',
+    description: 'Internal server error',
     schema: {
       type: 'object',
       properties: {
         status: { type: 'string', example: 'error' },
-        msg: { type: 'string', example: 'Server error - error message' },
+        message: { type: 'string', example: 'Server error - error message' },
       },
     },
-  })
-  @ApiForbiddenResponse({ description: 'Forbidden.' })
-  @ApiOperation({
-    summary:
-      'Store collection data for adding the content with the reference of the colletion id',
   })
   @Post()
   async create(@Res() response: FastifyReply, @Body() collection: collection) {
@@ -107,9 +143,13 @@ export class CollectionController {
     }
   }
 
+  @ApiOperation({
+    summary: 'Get all collections',
+    description: 'Retrieve a list of all collections in the system',
+  })
   @ApiResponse({
     status: 200,
-    description: 'Successfully retrieved items',
+    description: 'Collections retrieved successfully',
     schema: {
       type: 'object',
       properties: {
@@ -127,18 +167,9 @@ export class CollectionController {
               language: { type: 'string', example: 'kn' },
               status: { type: 'string', example: 'live' },
               tags: { type: 'array', items: { type: 'string' }, example: [] },
-              createdAt: {
-                type: 'string',
-                example: '2024-06-04T11:07:02.300Z',
-              },
-              updatedAt: {
-                type: 'string',
-                example: '2024-06-04T11:07:02.300Z',
-              },
-              collectionId: {
-                type: 'string',
-                example: '58009c39-fd86-45a5-bc32-9638a8198521',
-              },
+              createdAt: { type: 'string', format: 'date-time', example: '2024-06-04T11:07:02.300Z' },
+              updatedAt: { type: 'string', format: 'date-time', example: '2024-06-04T11:07:02.300Z' },
+              collectionId: { type: 'string', format: 'uuid', example: '58009c39-fd86-45a5-bc32-9638a8198521' },
               __v: { type: 'number', example: 0 },
             },
           },
@@ -146,19 +177,17 @@ export class CollectionController {
       },
     },
   })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized - Invalid or missing JWT token' })
   @ApiResponse({
     status: 500,
-    description: 'Error while retrive the data from collection',
+    description: 'Internal server error',
     schema: {
       type: 'object',
       properties: {
         status: { type: 'string', example: 'error' },
-        msg: { type: 'string', example: 'Server error - error message' },
+        message: { type: 'string', example: 'Server error - error message' },
       },
     },
-  })
-  @ApiOperation({
-    summary: 'Get all data from the collection',
   })
   @Get()
   async fatchAll(@Res() response: FastifyReply) {
@@ -173,14 +202,19 @@ export class CollectionController {
     }
   }
 
+  @ApiOperation({
+    summary: 'Get collections by language',
+    description: 'Retrieve all collections filtered by a specific language code',
+  })
   @ApiParam({
     name: 'language',
-    example: 'tn',
+    description: 'Language code to filter collections (e.g., en, hi, ta, kn, te, gu)',
+    example: 'ta',
+    required: true,
   })
   @ApiResponse({
     status: 200,
-    description:
-      'Successfully retrieved the collection data for the selected language',
+    description: 'Collections retrieved successfully for the specified language',
     schema: {
       type: 'object',
       properties: {
@@ -195,21 +229,12 @@ export class CollectionController {
               description: { type: 'string', example: 'Teacher-Teacher' },
               category: { type: 'string', example: 'Word' },
               author: { type: 'string', example: 'Ekstep' },
-              language: { type: 'string', example: 'kn' },
+              language: { type: 'string', example: 'ta' },
               status: { type: 'string', example: 'live' },
               tags: { type: 'array', items: { type: 'string' }, example: [] },
-              createdAt: {
-                type: 'string',
-                example: '2024-06-04T11:07:02.300Z',
-              },
-              updatedAt: {
-                type: 'string',
-                example: '2024-06-04T11:07:02.300Z',
-              },
-              collectionId: {
-                type: 'string',
-                example: '58009c39-fd86-45a5-bc32-9638a8198521',
-              },
+              createdAt: { type: 'string', format: 'date-time', example: '2024-06-04T11:07:02.300Z' },
+              updatedAt: { type: 'string', format: 'date-time', example: '2024-06-04T11:07:02.300Z' },
+              collectionId: { type: 'string', format: 'uuid', example: '58009c39-fd86-45a5-bc32-9638a8198521' },
               __v: { type: 'number', example: 0 },
             },
           },
@@ -217,19 +242,17 @@ export class CollectionController {
       },
     },
   })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized - Invalid or missing JWT token' })
   @ApiResponse({
     status: 500,
-    description: 'Error while retrive the data from collection',
+    description: 'Internal server error',
     schema: {
       type: 'object',
       properties: {
         status: { type: 'string', example: 'error' },
-        msg: { type: 'string', example: 'Server error - error message' },
+        message: { type: 'string', example: 'Server error - error message' },
       },
     },
-  })
-  @ApiOperation({
-    summary: 'Get all data from the collection with the specific language',
   })
   @Get('/bylanguage/:language')
   async fatchByLanguage(
@@ -247,13 +270,19 @@ export class CollectionController {
     }
   }
 
+  @ApiOperation({
+    summary: 'Get collection by ID',
+    description: 'Retrieve a specific collection by its MongoDB ObjectId',
+  })
   @ApiParam({
     name: 'id',
+    description: 'MongoDB ObjectId of the collection',
     example: '65717aea18da2cbda941cee2',
+    required: true,
   })
   @ApiResponse({
     status: 200,
-    description: 'Successfully retrieved collection data using collection id',
+    description: 'Collection retrieved successfully',
     schema: {
       type: 'object',
       properties: {
@@ -267,36 +296,38 @@ export class CollectionController {
             author: { type: 'string', example: 'Ekstep' },
             language: { type: 'string', example: 'kn' },
             status: { type: 'string', example: 'live' },
-            tags: {
-              type: 'array',
-              items: { type: 'string' },
-              example: ['ASR'],
-            },
-            createdAt: { type: 'string', example: '2024-06-07T06:14:44.161Z' },
-            updatedAt: { type: 'string', example: '2024-06-07T06:14:44.161Z' },
-            collectionId: {
-              type: 'string',
-              example: '7b762891-8337-46a6-8eb0-abfcdc5c7f35',
-            },
+            tags: { type: 'array', items: { type: 'string' }, example: ['ASR'] },
+            createdAt: { type: 'string', format: 'date-time', example: '2024-06-07T06:14:44.161Z' },
+            updatedAt: { type: 'string', format: 'date-time', example: '2024-06-07T06:14:44.161Z' },
+            collectionId: { type: 'string', format: 'uuid', example: '7b762891-8337-46a6-8eb0-abfcdc5c7f35' },
             __v: { type: 'number', example: 0 },
           },
         },
       },
     },
   })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized - Invalid or missing JWT token' })
   @ApiResponse({
-    status: 500,
-    description: 'Error while retrive the data from collection',
+    status: 404,
+    description: 'Collection not found',
     schema: {
       type: 'object',
       properties: {
         status: { type: 'string', example: 'error' },
-        msg: { type: 'string', example: 'Server error - error message' },
+        message: { type: 'string', example: 'Collection not found' },
       },
     },
   })
-  @ApiOperation({
-    summary: 'Get the collection data for collection id',
+  @ApiResponse({
+    status: 500,
+    description: 'Internal server error',
+    schema: {
+      type: 'object',
+      properties: {
+        status: { type: 'string', example: 'error' },
+        message: { type: 'string', example: 'Server error - error message' },
+      },
+    },
   })
   @Get('/:id')
   async findById(@Res() response: FastifyReply, @Param('id') id) {
@@ -306,82 +337,79 @@ export class CollectionController {
     });
   }
 
+  @ApiOperation({
+    summary: 'Update a collection',
+    description: 'Update an existing collection by its MongoDB ObjectId',
+  })
   @ApiParam({
     name: 'id',
+    description: 'MongoDB ObjectId of the collection to update',
     example: '65717aea18da2cbda941cee2',
+    required: true,
   })
   @ApiBody({
-    description: 'Request body for creating a new item',
+    description: 'Updated collection data',
     schema: {
       type: 'object',
       properties: {
-        name: { type: 'string', example: 'எழுத்துக்கள்' },
-        description: { type: 'string', example: 'ASAR Set எழுத்துக்கள்' },
-        category: { type: 'string', example: 'Char' },
-        author: { type: 'string', example: 'ASER' },
-        language: { type: 'string', example: 'ta' },
-        status: { type: 'string', example: 'live' },
-        tags: {
-          type: 'array',
-          items: { type: 'string' },
-          example: ['ASER', 'set1', 'm1'],
-        },
-        createdAt: { type: 'string', example: '2023-12-18T10:53:49.787Z' },
-        updatedAt: { type: 'string', example: '2023-12-18T10:53:49.788Z' },
-        collectionId: {
-          type: 'string',
-          example: '94312c93-5bb8-4144-8822-9a61ad1cd5a8',
-        },
-        __v: { type: 'number', example: 0 },
+        name: { type: 'string', example: 'எழுத்துக்கள்', description: 'Updated name of the collection' },
+        description: { type: 'string', example: 'ASAR Set எழுத்துக்கள்', description: 'Updated description' },
+        category: { type: 'string', example: 'Char', description: 'Category type (Word, Sentence, Paragraph, Char)' },
+        author: { type: 'string', example: 'ASER', description: 'Author or publisher' },
+        language: { type: 'string', example: 'ta', description: 'Language code' },
+        status: { type: 'string', example: 'live', description: 'Status (live, draft)' },
+        tags: { type: 'array', items: { type: 'string' }, example: ['ASER', 'set1', 'm1'], description: 'Tags for filtering' },
       },
     },
   })
   @ApiResponse({
     status: 200,
-    description: 'Successfully update the collection data using collection id',
+    description: 'Collection updated successfully',
     schema: {
       type: 'object',
       properties: {
-        collection: {
+        updated: {
           type: 'object',
           properties: {
             _id: { type: 'string', example: '6662a5848946f51e15abb9fd' },
-            name: { type: 'string', example: 'Teacher-Teacher' },
-            description: { type: 'string', example: 'Teacher-Teacher' },
-            category: { type: 'string', example: 'Word' },
-            author: { type: 'string', example: 'Ekstep' },
-            language: { type: 'string', example: 'kn' },
+            name: { type: 'string', example: 'எழுத்துக்கள்' },
+            description: { type: 'string', example: 'ASAR Set எழுத்துக்கள்' },
+            category: { type: 'string', example: 'Char' },
+            author: { type: 'string', example: 'ASER' },
+            language: { type: 'string', example: 'ta' },
             status: { type: 'string', example: 'live' },
-            tags: {
-              type: 'array',
-              items: { type: 'string' },
-              example: ['ASR'],
-            },
-            createdAt: { type: 'string', example: '2024-06-07T06:14:44.161Z' },
-            updatedAt: { type: 'string', example: '2024-06-07T06:14:44.161Z' },
-            collectionId: {
-              type: 'string',
-              example: '7b762891-8337-46a6-8eb0-abfcdc5c7f35',
-            },
+            tags: { type: 'array', items: { type: 'string' }, example: ['ASER', 'set1', 'm1'] },
+            createdAt: { type: 'string', format: 'date-time', example: '2024-06-07T06:14:44.161Z' },
+            updatedAt: { type: 'string', format: 'date-time', example: '2024-06-07T06:14:44.161Z' },
+            collectionId: { type: 'string', format: 'uuid', example: '7b762891-8337-46a6-8eb0-abfcdc5c7f35' },
             __v: { type: 'number', example: 0 },
           },
         },
       },
     },
   })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized - Invalid or missing JWT token' })
   @ApiResponse({
-    status: 500,
-    description: 'Error while retrive the data from collection',
+    status: 404,
+    description: 'Collection not found',
     schema: {
       type: 'object',
       properties: {
         status: { type: 'string', example: 'error' },
-        msg: { type: 'string', example: 'Server error - error message' },
+        message: { type: 'string', example: 'Collection not found' },
       },
     },
   })
-  @ApiOperation({
-    summary: 'update the collection data using collection id',
+  @ApiResponse({
+    status: 500,
+    description: 'Internal server error',
+    schema: {
+      type: 'object',
+      properties: {
+        status: { type: 'string', example: 'error' },
+        message: { type: 'string', example: 'Server error - error message' },
+      },
+    },
   })
   @Put('/:id')
   async update(
@@ -395,13 +423,19 @@ export class CollectionController {
     });
   }
 
+  @ApiOperation({
+    summary: 'Delete a collection',
+    description: 'Delete an existing collection by its MongoDB ObjectId. This will permanently remove the collection.',
+  })
   @ApiParam({
     name: 'id',
+    description: 'MongoDB ObjectId of the collection to delete',
     example: '65717aea18da2cbda941cee2',
+    required: true,
   })
   @ApiResponse({
     status: 200,
-    description: 'The item has been successfully deleted.',
+    description: 'Collection deleted successfully',
     schema: {
       type: 'object',
       properties: {
@@ -415,36 +449,38 @@ export class CollectionController {
             author: { type: 'string', example: 'ASER' },
             language: { type: 'string', example: 'kn' },
             status: { type: 'string', example: 'live' },
-            tags: {
-              type: 'array',
-              items: { type: 'string' },
-              example: ['ASER', 'set1', 'm1'],
-            },
-            createdAt: { type: 'string', example: '2023-12-18T10:53:49.787Z' },
-            updatedAt: { type: 'string', example: '2023-12-18T10:53:49.788Z' },
-            collectionId: {
-              type: 'string',
-              example: '94312c93-5bb8-4144-8822-9a61ad1cd5a8',
-            },
+            tags: { type: 'array', items: { type: 'string' }, example: ['ASER', 'set1', 'm1'] },
+            createdAt: { type: 'string', format: 'date-time', example: '2023-12-18T10:53:49.787Z' },
+            updatedAt: { type: 'string', format: 'date-time', example: '2023-12-18T10:53:49.788Z' },
+            collectionId: { type: 'string', format: 'uuid', example: '94312c93-5bb8-4144-8822-9a61ad1cd5a8' },
             __v: { type: 'number', example: 0 },
           },
         },
       },
     },
   })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized - Invalid or missing JWT token' })
   @ApiResponse({
-    status: 500,
-    description: 'Error while deleting the data from collection',
+    status: 404,
+    description: 'Collection not found',
     schema: {
       type: 'object',
       properties: {
         status: { type: 'string', example: 'error' },
-        msg: { type: 'string', example: 'Server error - error message' },
+        message: { type: 'string', example: 'Collection not found' },
       },
     },
   })
-  @ApiOperation({
-    summary: 'delete the collection data using collection id',
+  @ApiResponse({
+    status: 500,
+    description: 'Internal server error',
+    schema: {
+      type: 'object',
+      properties: {
+        status: { type: 'string', example: 'error' },
+        message: { type: 'string', example: 'Server error - error message' },
+      },
+    },
   })
   @Delete('/:id')
   async delete(@Res() response: FastifyReply, @Param('id') id) {
