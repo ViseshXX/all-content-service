@@ -625,10 +625,18 @@ export class contentController {
   async getContentWord(
     @Res() response: FastifyReply,
     @Query('language') language: string,
-    @Query('limit') limit: number = 5,
+    @Query('limit') limit: any,
     @Query('multilingual') multilingual: string,
   ) {
     try {
+      // Validate and parse limit parameter
+      let validLimit = 5; // default
+      if (limit !== undefined && limit !== null) {
+        const parsedLimit = parseInt(String(limit), 10);
+        if (!isNaN(parsedLimit) && parsedLimit > 0) {
+          validLimit = parsedLimit;
+        }
+      }
       const includeMultilingual = multilingual === 'true';
 
       const { data } = await this.contentService.getContentWord(
@@ -636,8 +644,11 @@ export class contentController {
         language,
         includeMultilingual,
       );
+      
+       // Ensure we don't return more than requested
+      const limitedData = data.slice(0, validLimit);
 
-      return response.status(HttpStatus.OK).send({ status: 'success', data });
+      return response.status(HttpStatus.OK).send({ status: 'success', data: limitedData });
     } catch (error) {
       return response.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
         status: 'error',
