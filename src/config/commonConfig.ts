@@ -262,7 +262,13 @@ var common_config = {
     'CEFR_M3_L1',
     'CEFR_M3_L2',
     'CEFR_M3_L3',
-    'CEFR_M3_L4'
+    'CEFR_M3_L4',
+    'M4_TE_MECH',
+    'M5_TE_MECH',
+    'M6_TE_MECH',
+    'M7_TE_MECH',
+    'M8_TE_MECH',
+    'M9_TE_MECH',
 ]
 
 };
