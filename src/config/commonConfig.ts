@@ -269,8 +269,13 @@ var common_config = {
     'M7_TE_MECH',
     'M8_TE_MECH',
     'M9_TE_MECH',
-]
-
+    'M4_TE_READ',
+    'M5_TE_READ',
+    'M6_TE_READ',
+    'M7_TE_READ',
+    'M8_TE_READ',
+    'M9_TE_READ',
+  ]
 };
 
 export default common_config;

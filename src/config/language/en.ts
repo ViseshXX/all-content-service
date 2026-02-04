@@ -109,6 +109,12 @@ var en_config = {
     'M7_GEN-EN_MECH',
     'M8_GEN-EN_MECH',
     'M9_GEN-EN_MECH',
+    'M4_GEN-EN_READ',
+    'M5_GEN-EN_READ',
+    'M6_GEN-EN_READ',
+    'M7_GEN-EN_READ',
+    'M8_GEN-EN_READ',
+    'M9_GEN-EN_READ'
   ],
   contentLevel: [
     {
