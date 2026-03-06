@@ -151,174 +151,165 @@ export class contentController {
     try {
       const lcSupportedLanguages = ['ta', 'ka', 'hi', 'te', 'kn'];
 
+      async function getSyllableCount(text: string): Promise<number> {
+        return splitGraphemes.splitGraphemes(
+          text.replace(
+            /[\u200B\u200C\u200D\uFEFF\s!@#$%^&*()_+{}\[\]:;<>,.?\/\\|~'"-=]/g,
+            '',
+          ),
+        ).length;
+      }
+
       const updatedcontentSourceData = await Promise.all(
         content.contentSourceData.map(async (contentSourceDataEle) => {
-          if (lcSupportedLanguages.includes(contentSourceDataEle['language'])) {
-            let contentLanguage = contentSourceDataEle['language'];
+          const lang: string = contentSourceDataEle['language'];
 
-            if (contentSourceDataEle['language'] === 'kn') {
-              contentLanguage = 'ka';
+          if (lcSupportedLanguages.includes(lang)) {
+            const contentLanguage = lang === 'kn' ? 'ka' : lang;
+
+            if (!process.env.ALL_LC_API_URL) {
+              const msg = `ALL_LC_API_URL is not configured. Cannot compute language-complexity enrichment for language "${contentLanguage}".`;
+              console.error(`[content.create] ${msg}`);
+              throw new Error(msg);
             }
 
             const url = process.env.ALL_LC_API_URL + contentLanguage;
             const textData = {
-              request: {
-                language_id: contentLanguage,
-                text: contentSourceDataEle['text'],
-              },
+              request: { language_id: contentLanguage, text: contentSourceDataEle['text'] },
             };
 
-            const newContent = await lastValueFrom(
-              this.httpService
-                .post(url, JSON.stringify(textData), {
-                  headers: {
-                    'Content-Type': 'application/json',
-                  },
-                })
-                .pipe(map((resp) => resp.data)),
-            );
-
-            const newWordMeasures = Object.entries(
-              newContent.result.wordMeasures,
-            ).map((wordMeasuresEle) => {
-              const wordComplexityMatrices: any = wordMeasuresEle[1];
-              return { text: wordMeasuresEle[0], ...wordComplexityMatrices };
-            });
-
-            delete newContent.result.meanWordComplexity;
-            delete newContent.result.totalWordComplexity;
-            delete newContent.result.wordComplexityMap;
-            delete newContent.result.syllableCount;
-            delete newContent.result.syllableCountMap;
-
-            async function getSyllableCount(text) {
-              return splitGraphemes.splitGraphemes(
-                text.replace(
-                  /[\u200B\u200C\u200D\uFEFF\s!@#$%^&*()_+{}\[\]:;<>,.?\/\\|~'"-=]/g,
-                  '',
-                ),
-              ).length;
+            let lcResponse: any;
+            try {
+              lcResponse = await lastValueFrom(
+                this.httpService
+                  .post(url, JSON.stringify(textData), { headers: { 'Content-Type': 'application/json' } })
+                  .pipe(map((resp) => resp.data)),
+              );
+            } catch (lcError: any) {
+              const status = lcError?.response?.status;
+              const detail = lcError?.response?.data ?? lcError?.message ?? String(lcError);
+              console.error(
+                `[content.create] Language-complexity API call failed for language "${contentLanguage}" (url: ${url}).`,
+                `Status: ${status ?? 'N/A'}.`,
+                `Detail:`, detail,
+              );
+              throw new Error(
+                `Language-complexity service unavailable for language "${contentLanguage}" (HTTP ${status ?? 'N/A'}): ${JSON.stringify(detail)}`,
+              );
             }
 
-            const syllableCount = await getSyllableCount(
-              contentSourceDataEle['text'],
+            const newWordMeasures = Object.entries(lcResponse.result.wordMeasures).map(
+              ([word, matrices]: [string, any]) => ({ text: word, ...matrices }),
             );
+            delete lcResponse.result.meanWordComplexity;
+            delete lcResponse.result.totalWordComplexity;
+            delete lcResponse.result.wordComplexityMap;
+            delete lcResponse.result.syllableCount;
+            delete lcResponse.result.syllableCountMap;
+            lcResponse.result.wordMeasures = newWordMeasures;
 
-            const syllableCountMap = {};
-
+            const syllableCount = await getSyllableCount(contentSourceDataEle['text']);
+            const syllableCountMap: Record<string, number> = {};
             for (const wordEle of contentSourceDataEle['text'].split(' ')) {
               syllableCountMap[wordEle] = await getSyllableCount(wordEle);
             }
-            if (common_config.readingComplexityLang.includes(contentSourceDataEle['language'])) {
-              
-              const urls = process.env.ALL_TEXT_EVAL_URL + 'getReadingComplexity';
 
-              const reqBody = {
-                language: contentSourceDataEle['language'],
-                text: contentSourceDataEle['text'],
-              };
-              const readingComplexity = await lastValueFrom(
-                this.httpService
-                  .post(urls, reqBody, {
-                    headers: {
-                      'Content-Type': 'application/json',
-                    },
-                  })
-                  .pipe(map((resp) => resp.data))
-              );
-              newContent.result.readingComplexity = readingComplexity.total_score;
+            if (common_config.readingComplexityLang.includes(lang)) {
+              if (!process.env.ALL_TEXT_EVAL_URL) {
+                const msg = `ALL_TEXT_EVAL_URL is not configured. Cannot compute reading-complexity for language "${lang}".`;
+                console.error(`[content.create] ${msg}`);
+                throw new Error(msg);
+              }
+              try {
+                const rcUrl = process.env.ALL_TEXT_EVAL_URL + 'getReadingComplexity';
+                const readingComplexity = await lastValueFrom(
+                  this.httpService
+                    .post(rcUrl, { language: lang, text: contentSourceDataEle['text'] }, {
+                      headers: { 'Content-Type': 'application/json' },
+                    })
+                    .pipe(map((resp) => resp.data)),
+                );
+                lcResponse.result.readingComplexity = readingComplexity.total_score;
+              } catch (rcError: any) {
+                const status = rcError?.response?.status;
+                const detail = rcError?.response?.data ?? rcError?.message ?? String(rcError);
+                console.error(
+                  `[content.create] Reading-complexity API call failed for language "${lang}".`,
+                  `Status: ${status ?? 'N/A'}.`,
+                  `Detail:`, detail,
+                );
+                throw new Error(
+                  `Reading-complexity service unavailable for language "${lang}" (HTTP ${status ?? 'N/A'}): ${JSON.stringify(detail)}`,
+                );
+              }
             }
-
-            newContent.result.wordMeasures = newWordMeasures;
 
             return {
               ...contentSourceDataEle,
-              ...newContent.result,
-              syllableCount: syllableCount,
-              syllableCountMap: syllableCountMap,
+              ...lcResponse.result,
+              syllableCount,
+              syllableCountMap,
             };
-          } else if (contentSourceDataEle['language'] === 'en') {
+
+          } else if (lang === 'en') {
+            if (!process.env.ALL_TEXT_EVAL_URL) {
+              const msg = `ALL_TEXT_EVAL_URL is not configured. Cannot compute phoneme enrichment for English.`;
+              console.error(`[content.create] ${msg}`);
+              throw new Error(msg);
+            }
+
             const url = process.env.ALL_TEXT_EVAL_URL + 'getPhonemes';
-
-            const textData = {
-              text: contentSourceDataEle['text'],
-            };
-
-            const newContent = await lastValueFrom(
-              this.httpService
-                .post(url, JSON.stringify(textData), {
-                  headers: {
-                    'Content-Type': 'application/json',
-                  },
-                  timeout: 10000, // Increase timeout to 10 seconds
-                })
-                .pipe(map((resp) => resp.data)),
-            );
+            let phonemeResult: any;
+            try {
+              phonemeResult = await lastValueFrom(
+                this.httpService
+                  .post(url, JSON.stringify({ text: contentSourceDataEle['text'] }), {
+                    headers: { 'Content-Type': 'application/json' },
+                    timeout: 10000,
+                  })
+                  .pipe(map((resp) => resp.data)),
+              );
+            } catch (phonemeError: any) {
+              const status = phonemeError?.response?.status;
+              const detail = phonemeError?.response?.data ?? phonemeError?.message ?? String(phonemeError);
+              console.error(
+                `[content.create] Phoneme API call failed for English (url: ${url}).`,
+                `Status: ${status ?? 'N/A'}.`,
+                `Detail:`, detail,
+              );
+              throw new Error(
+                `Phoneme service unavailable for English (HTTP ${status ?? 'N/A'}): ${JSON.stringify(detail)}`,
+              );
+            }
 
             const text = contentSourceDataEle['text'].replace(/[^\w\s]/gi, '');
-
             const totalWordCount = text.split(' ').length;
+            const totalSyllableCount = text.toLowerCase().replace(/\s+/g, '').split('').length;
 
-            const totalSyllableCount = text
-              .toLowerCase()
-              .replace(/\s+/g, '')
-              .split('').length;
-
-            function countWordFrequency(text) {
-              // Convert text to lowercase and split it into words
-              const words = text
-                .toLowerCase()
-                .split(/\W+/)
-                .filter((word) => word.length > 0);
-
-              // Create an object to store word frequencies
-              const wordFrequency = {};
-
-              // Count the frequency of each word
-              words.forEach((word) => {
-                if (wordFrequency[word]) {
-                  wordFrequency[word]++;
-                } else {
-                  wordFrequency[word] = 1;
-                }
-              });
-
-              return wordFrequency;
+            function countWordFrequency(t: string): Record<string, number> {
+              const words = t.toLowerCase().split(/\W+/).filter((w) => w.length > 0);
+              const freq: Record<string, number> = {};
+              words.forEach((w) => { freq[w] = (freq[w] ?? 0) + 1; });
+              return freq;
             }
 
-            function countUniqueCharactersPerWord(sentence) {
-              // Convert the sentence to lowercase to make the count case-insensitive
-              sentence = sentence.toLowerCase();
-
-              // Split the sentence into words
-              const words = sentence.split(/\s+/);
-
-              // Create an object to store unique character counts for each word
-              const uniqueCharCounts = {};
-
-              // Iterate through each word
-              words.forEach((word) => {
-                uniqueCharCounts[word] = word
-                  .toLowerCase()
-                  .replace(/\s+/g, '')
-                  .split('').length;
+            function countUniqueCharactersPerWord(sentence: string): Record<string, number> {
+              const counts: Record<string, number> = {};
+              sentence.toLowerCase().split(/\s+/).forEach((w) => {
+                counts[w] = w.replace(/\s+/g, '').split('').length;
               });
-
-              // Return the object containing unique character counts for each word
-              return uniqueCharCounts;
+              return counts;
             }
-
-            const frequency = countWordFrequency(text);
-            const syllableCountMap = countUniqueCharactersPerWord(text);
 
             return {
               ...contentSourceDataEle,
-              ...newContent,
+              ...phonemeResult,
               wordCount: totalWordCount,
-              wordFrequency: frequency,
+              wordFrequency: countWordFrequency(text),
               syllableCount: totalSyllableCount,
-              syllableCountMap: syllableCountMap,
+              syllableCountMap: countUniqueCharactersPerWord(text),
             };
+
           } else {
             return { ...contentSourceDataEle };
           }
@@ -333,10 +324,12 @@ export class contentController {
         status: 'success',
         data: newContent,
       });
-    } catch (error) {
+    } catch (error: any) {
+      const message: string = error?.message ?? String(error);
+      console.error('[content.create] Failed to create content:', message);
       return response.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
         status: 'error',
-        message: 'Server error - ' + error,
+        message,
       });
     }
   }

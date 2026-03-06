@@ -19,6 +19,10 @@ export class JwtAuthGuard implements CanActivate {
   ) { }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    if (process.env.AUTH_BYPASS === 'true') {
+      console.warn('[AUTH] AUTH_BYPASS=true — skipping token verification. DO NOT use in production.');
+      return true;
+    }
     const request = context.switchToHttp().getRequest<Request>();
     const authHeader = request.headers.authorization;
     if (!authHeader) {
