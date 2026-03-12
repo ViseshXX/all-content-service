@@ -275,6 +275,7 @@ var common_config = {
     'M7_TE_READ',
     'M8_TE_READ',
     'M9_TE_READ',
+    'M9_TE_TBImage',
   ]
 };
 
