@@ -25,6 +25,11 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/auth/auth.guard';
+import {
+  ResourceNotFoundException,
+  ValidationException,
+} from 'src/common/exceptions/api.exceptions';
+import { Types } from 'mongoose';
 
 @ApiTags('collection')
 @ApiBearerAuth('access-token')
@@ -136,10 +141,7 @@ export class CollectionController {
         data: newCollection,
       });
     } catch (error) {
-      return response.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
-        status: 'error',
-        message: 'Server error - ' + error,
-      });
+      throw error;
     }
   }
 
@@ -195,10 +197,7 @@ export class CollectionController {
       const data = await this.CollectionService.readAll();
       return response.status(HttpStatus.OK).send({ status: 'success', data });
     } catch (error) {
-      return response.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
-        status: 'error',
-        message: 'Server error - ' + error,
-      });
+      throw error;
     }
   }
 
@@ -260,13 +259,13 @@ export class CollectionController {
     @Param('language') language,
   ) {
     try {
+      if (!language) {
+        throw new ValidationException('language is required.');
+      }
       const data = await this.CollectionService.readbyLanguage(language);
       return response.status(HttpStatus.OK).send({ status: 'success', data });
     } catch (error) {
-      return response.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
-        status: 'error',
-        message: 'Server error - ' + error,
-      });
+      throw error;
     }
   }
 
@@ -331,7 +330,16 @@ export class CollectionController {
   })
   @Get('/:id')
   async findById(@Res() response: FastifyReply, @Param('id') id) {
+    if (!id) {
+      throw new ValidationException('id is required.');
+    }
+    if (!Types.ObjectId.isValid(id)) {
+      throw new ResourceNotFoundException('Collection not found.');
+    }
     const collection = await this.CollectionService.readById(id);
+    if (!collection) {
+      throw new ResourceNotFoundException('Collection not found.');
+    }
     return response.status(HttpStatus.OK).send({
       collection,
     });
@@ -417,7 +425,16 @@ export class CollectionController {
     @Param('id') id,
     @Body() collection: collection,
   ) {
+    if (!id) {
+      throw new ValidationException('id is required.');
+    }
+    if (!Types.ObjectId.isValid(id)) {
+      throw new ResourceNotFoundException('Collection not found for update.');
+    }
     const updated = await this.CollectionService.update(id, collection);
+    if (!updated) {
+      throw new ResourceNotFoundException('Collection not found for update.');
+    }
     return response.status(HttpStatus.OK).send({
       updated,
     });
@@ -484,7 +501,16 @@ export class CollectionController {
   })
   @Delete('/:id')
   async delete(@Res() response: FastifyReply, @Param('id') id) {
+    if (!id) {
+      throw new ValidationException('id is required.');
+    }
+    if (!Types.ObjectId.isValid(id)) {
+      throw new ResourceNotFoundException('Collection not found for deletion.');
+    }
     const deleted = await this.CollectionService.delete(id);
+    if (!deleted) {
+      throw new ResourceNotFoundException('Collection not found for deletion.');
+    }
     return response.status(HttpStatus.OK).send({
       deleted,
     });

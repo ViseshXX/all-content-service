@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   HttpStatus,
+  Logger,
   Param,
   Post,
   Put,
@@ -15,7 +16,7 @@ import { contentService } from '../services/content.service';
 import { CollectionService } from '../services/collection.service';
 import { FastifyReply } from 'fastify';
 import { HttpService } from '@nestjs/axios';
-import { lastValueFrom, map } from 'rxjs';
+import { catchError, lastValueFrom, map, timeout } from 'rxjs';
 import * as splitGraphemes from 'split-graphemes';
 import {
   ApiBearerAuth,
@@ -32,12 +33,20 @@ import {
 import { JwtAuthGuard } from 'src/auth/auth.guard';
 import en_config from 'src/config/language/en';
 import common_config from 'src/config/commonConfig';
+import {
+  ExternalServiceException,
+  ExternalServiceTimeoutException,
+  ResourceNotFoundException,
+  ValidationException,
+} from 'src/common/exceptions/api.exceptions';
 
 @ApiTags('content')
 @ApiBearerAuth('access-token')
 @Controller('content')
 @UseGuards(JwtAuthGuard)
 export class contentController {
+  private readonly logger = new Logger(contentController.name);
+
   constructor(
     private readonly contentService: contentService,
     private readonly collectionService: CollectionService,
@@ -149,6 +158,9 @@ export class contentController {
   @Post()
   async create(@Res() response: FastifyReply, @Body() content: any) {
     try {
+      if (!Array.isArray(content?.contentSourceData)) {
+        throw new ValidationException('contentSourceData must be an array.');
+      }
       const lcSupportedLanguages = ['ta', 'ka', 'hi', 'te', 'kn'];
 
       const updatedcontentSourceData = await Promise.all(
@@ -168,14 +180,11 @@ export class contentController {
               },
             };
 
-            const newContent = await lastValueFrom(
-              this.httpService
-                .post(url, JSON.stringify(textData), {
-                  headers: {
-                    'Content-Type': 'application/json',
-                  },
-                })
-                .pipe(map((resp) => resp.data)),
+            const newContent = await this.callExternalApi(
+              url,
+              textData,
+              8000,
+              'LC_SERVICE_ANALYSIS',
             );
 
             const newWordMeasures = Object.entries(
@@ -217,14 +226,11 @@ export class contentController {
                 language: contentSourceDataEle['language'],
                 text: contentSourceDataEle['text'],
               };
-              const readingComplexity = await lastValueFrom(
-                this.httpService
-                  .post(urls, reqBody, {
-                    headers: {
-                      'Content-Type': 'application/json',
-                    },
-                  })
-                  .pipe(map((resp) => resp.data))
+              const readingComplexity = await this.callExternalApi(
+                urls,
+                reqBody,
+                8000,
+                'TEXT_EVAL_READING_COMPLEXITY',
               );
               newContent.result.readingComplexity = readingComplexity.total_score;
             }
@@ -244,15 +250,11 @@ export class contentController {
               text: contentSourceDataEle['text'],
             };
 
-            const newContent = await lastValueFrom(
-              this.httpService
-                .post(url, JSON.stringify(textData), {
-                  headers: {
-                    'Content-Type': 'application/json',
-                  },
-                  timeout: 10000, // Increase timeout to 10 seconds
-                })
-                .pipe(map((resp) => resp.data)),
+            const newContent = await this.callExternalApi(
+              url,
+              textData,
+              10000,
+              'TEXT_EVAL_PHONEMES',
             );
 
             const text = contentSourceDataEle['text'].replace(/[^\w\s]/gi, '');
@@ -334,10 +336,7 @@ export class contentController {
         data: newContent,
       });
     } catch (error) {
-      return response.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
-        status: 'error',
-        message: 'Server error - ' + error,
-      });
+      throw error;
     }
   }
 
@@ -360,10 +359,7 @@ export class contentController {
         data: contentCollection,
       });
     } catch (error) {
-      return response.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
-        status: 'error',
-        message: 'Server error - ' + error,
-      });
+      throw error;
     }
   }
 
@@ -382,10 +378,7 @@ export class contentController {
         data: contentCollection,
       });
     } catch (error) {
-      return response.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
-        status: 'error',
-        message: 'Server error - ' + error,
-      });
+      throw error;
     }
   }
 
@@ -487,6 +480,9 @@ export class contentController {
         type,
         collectionId,
       );
+      if (!data || data.length === 0) {
+        throw new ResourceNotFoundException('No content found for pagination.');
+      }
       const language = data[0].language;
 
       let totalSyllableCount = 0;
@@ -507,10 +503,7 @@ export class contentController {
         totalSyllableCount: totalSyllableCount,
       });
     } catch (error) {
-      return response.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
-        status: 'error',
-        message: 'Server error - ' + error,
-      });
+      throw error;
     }
   }
 
@@ -613,10 +606,7 @@ export class contentController {
       );
       return response.status(HttpStatus.OK).send({ status: 'success', data });
     } catch (error) {
-      return response.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
-        status: 'error',
-        message: 'Server error - ' + error,
-      });
+      throw error;
     }
   }
 
@@ -650,10 +640,7 @@ export class contentController {
 
       return response.status(HttpStatus.OK).send({ status: 'success', data: limitedData });
     } catch (error) {
-      return response.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
-        status: 'error',
-        message: 'Server error - ' + error,
-      });
+      throw error;
     }
   }
 
@@ -672,10 +659,7 @@ export class contentController {
       );
       return response.status(HttpStatus.OK).send({ status: 'success', data });
     } catch (error) {
-      return response.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
-        status: 'error',
-        message: 'Server error - ' + error,
-      });
+      throw error;
     }
   }
 
@@ -694,10 +678,7 @@ export class contentController {
       );
       return response.status(HttpStatus.OK).send({ status: 'success', data });
     } catch (error) {
-      return response.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
-        status: 'error',
-        message: 'Server error - ' + error,
-      });
+      throw error;
     }
   }
 
@@ -1143,11 +1124,7 @@ export class contentController {
         data: contentCollection,
       });
     } catch (error) {
-      console.log(error);
-      return response.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
-        status: 'error',
-        message: 'Server error - ' + error,
-      });
+      throw error;
     }
   }
 
@@ -1179,11 +1156,7 @@ export class contentController {
         data: contentCollection,
       });
     } catch (error) {
-      console.log(error);
-      return response.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
-        status: 'error',
-        message: 'Server error - ' + error,
-      });
+      throw error;
     }
   }
 
@@ -1278,10 +1251,7 @@ export class contentController {
 
       return response.status(HttpStatus.CREATED).send(contentCollection);
     } catch (error) {
-      return response.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
-        status: 'error',
-        message: 'Server error - ' + error,
-      });
+      throw error;
     }
   }
 
@@ -1302,10 +1272,7 @@ export class contentController {
         contentCollection,
       });
     } catch (error) {
-      return response.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
-        status: 'error',
-        message: 'Server error - ' + error,
-      });
+      throw error;
     }
   }
 
@@ -1328,10 +1295,7 @@ export class contentController {
         data,
       });
     } catch (error) {
-      return response.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
-        status: 'error',
-        message: 'Server error - ' + error,
-      });
+      throw error;
     }
   }
 
@@ -1339,19 +1303,22 @@ export class contentController {
   @Get('/getByIds')
   async findByIds(@Res() response: FastifyReply, @Query('ids') ids: string) {
     try {
+      if (!ids) {
+        throw new ValidationException('ids query parameter is required.');
+      }
       const idList = ids.split(',').map(id => id.trim());
 
       const contents = await this.contentService.readByIds(idList);
+      if (!contents || contents.length === 0) {
+        throw new ResourceNotFoundException('No content found for provided ids.');
+      }
 
       return response.status(HttpStatus.OK).send({
         contents,
         count: contents.length,
       });
     } catch (error) {
-      return response.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
-        status: 'error',
-        message: 'Error fetching content: ' + error.message,
-      });
+      throw error;
     }
   }
 
@@ -1364,6 +1331,12 @@ export class contentController {
     @Body() content: any,
   ) {
     try {
+      if (!id) {
+        throw new ValidationException('id is required.');
+      }
+      if (!Array.isArray(content?.contentSourceData)) {
+        throw new ValidationException('contentSourceData must be an array.');
+      }
       const lcSupportedLanguages = ['ta', 'ka', 'hi', 'te', 'kn'];
 
       const updatedcontentSourceData = await Promise.all(
@@ -1383,14 +1356,11 @@ export class contentController {
               },
             };
 
-            const newContent = await lastValueFrom(
-              this.httpService
-                .post(url, JSON.stringify(textData), {
-                  headers: {
-                    'Content-Type': 'application/json',
-                  },
-                })
-                .pipe(map((resp) => resp.data)),
+            const newContent = await this.callExternalApi(
+              url,
+              textData,
+              8000,
+              'LC_SERVICE_ANALYSIS',
             );
 
             const newWordMeasures = Object.entries(
@@ -1414,14 +1384,11 @@ export class contentController {
               text: contentSourceDataEle['text'],
             };
 
-            const newContent = await lastValueFrom(
-              this.httpService
-                .post(url, JSON.stringify(textData), {
-                  headers: {
-                    'Content-Type': 'application/json',
-                  },
-                })
-                .pipe(map((resp) => resp.data)),
+            const newContent = await this.callExternalApi(
+              url,
+              textData,
+              10000,
+              'TEXT_EVAL_PHONEMES',
             );
 
             const text = contentSourceDataEle['text'].replace(/[^\w\s]/gi, '');
@@ -1496,23 +1463,29 @@ export class contentController {
 
       content.contentSourceData = updatedcontentSourceData;
       const updatedContent = await this.contentService.update(id, content);
+      if (!updatedContent) {
+        throw new ResourceNotFoundException('data is not available for this _id');
+      }
 
       return response.status(HttpStatus.OK).send({
         status: 'success',
         data: updatedContent,
       });
     } catch (error) {
-      return response.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
-        status: 'error',
-        message: 'Server error - ' + error,
-      });
+      throw error;
     }
   }
 
   @ApiExcludeEndpoint(true)
   @Delete('/:id')
   async delete(@Res() response: FastifyReply, @Param('id') id) {
+    if (!id) {
+      throw new ValidationException('id is required.');
+    }
     const deleted = await this.contentService.delete(id);
+    if (!deleted) {
+      throw new ResourceNotFoundException('data is not available for this _id');
+    }
     return response.status(HttpStatus.OK).send({
       deleted,
     });
@@ -1613,10 +1586,52 @@ export class contentController {
         data: newMultilingual
       });
     } catch (error) {
-      return response.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
-        status: 'error',
-        message: 'Server error - ' + error.message
-      });
+      throw error;
+    }
+  }
+
+  private async callExternalApi(
+    url: string,
+    payload: Record<string, unknown>,
+    timeoutMs: number,
+    serviceName: string,
+  ): Promise<any> {
+    try {
+      return await lastValueFrom(
+        this.httpService
+          .post(url, payload, {
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          })
+          .pipe(
+            timeout(timeoutMs),
+            map((resp) => resp.data),
+            catchError((error) => {
+              this.logger.error(
+                JSON.stringify({
+                  apiName: 'content.externalCall',
+                  serviceName,
+                  timestamp: new Date().toISOString(),
+                  error: {
+                    name: error?.name || 'Error',
+                    message: error?.message || 'External API call failed',
+                  },
+                }),
+              );
+              throw error;
+            }),
+          ),
+      );
+    } catch (error) {
+      if (error?.name === 'TimeoutError') {
+        throw new ExternalServiceTimeoutException(
+          `${serviceName} timed out while processing request.`,
+        );
+      }
+      throw new ExternalServiceException(
+        `${serviceName} is currently unavailable. Please try again later.`,
+      );
     }
   }
 }
