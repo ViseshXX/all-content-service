@@ -1253,7 +1253,7 @@ export class contentController {
 
       if (queryData.tags.includes('ASER')) {
         let collectionArr = [];
-        for (let setno = 1; setno <= 5; setno++) {
+        for (let setno = 1; setno <= 6; setno++) {
           let tags = [];
           tags.push(...queryData.tags);
           tags.push('set' + setno);
@@ -1262,7 +1262,7 @@ export class contentController {
             queryData.language,
           );
           if (collection.data[0] != null) {
-            collectionArr.push(collection.data[0]);
+           collectionArr.push(collection.data[0]);
           }
         }
         contentCollection = {
