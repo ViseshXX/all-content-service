@@ -1166,7 +1166,7 @@ describe('contentController', () => {
 
       await controller.getAssessment(mockReply as FastifyReply, queryData);
 
-      expect(getAssessmentMock).toHaveBeenCalledTimes(5); // for set1 to set5
+      expect(getAssessmentMock).toHaveBeenCalledTimes(6); // for set1 to set6
       expect(mockReply.status).toHaveBeenCalledWith(HttpStatus.CREATED);
       expect(mockReply.send).toHaveBeenCalledWith({
         data: expect.any(Array),

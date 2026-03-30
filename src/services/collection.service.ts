@@ -57,6 +57,7 @@ export class CollectionService {
           name: 1,
           category: 1,
           collectionId: 1,
+          tags: 1,
         },
       },
     ]);
