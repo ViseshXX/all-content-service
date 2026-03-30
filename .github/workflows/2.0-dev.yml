@@ -3,7 +3,7 @@ name: Deploy Dev - All Content Service
 on:
   push:
     branches:
-      - lais-v2.2
+      - lais-v3.0.3
 
 jobs:
   deploy:
