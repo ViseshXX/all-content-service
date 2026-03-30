@@ -1189,7 +1189,7 @@ export class contentController {
 
   @ApiOperation({
     summary: 'Get assessment collections',
-    description: 'Retrieve assessment collections filtered by tags and language. For ASER assessments, returns collections across all 5 sets.',
+    description: 'Retrieve assessment collections filtered by tags and language. For ASER assessments, returns collections across all 6 sets.',
   })
   @ApiBody({
     description: 'Assessment filter parameters',
