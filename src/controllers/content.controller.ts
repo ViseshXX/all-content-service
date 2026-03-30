@@ -1262,7 +1262,7 @@ export class contentController {
             queryData.language,
           );
           if (collection.data[0] != null) {
-            collectionArr.push(collection.data[0]);
+           collectionArr.push(collection.data[0]);
           }
         }
         contentCollection = {
