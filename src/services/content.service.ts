@@ -16,13 +16,8 @@ export class contentService {
   ) { }
 
   async create(content: content): Promise<content> {
-    try {
-      const newcontent = new this.content(content);
-      const savedData = newcontent.save();
-      return savedData;
-    } catch (error) {
-      return error;
-    }
+    const newcontent = new this.content(content);
+    return await newcontent.save();
   }
 
   async readAll(page: number, limit: number): Promise<content[]> {

@@ -8,6 +8,8 @@ import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppClusterService } from './app-cluster.service';
 import * as cors from 'cors';
+import { ValidationException } from './common/exceptions/api.exceptions';
+import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 
 
 async function bootstrap() {
@@ -16,7 +18,31 @@ async function bootstrap() {
     new FastifyAdapter(),
   );
 
-  app.useGlobalPipes(new ValidationPipe());
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+      exceptionFactory: (errors) => {
+        const errorItems = errors.flatMap((e) => {
+          const constraints = e.constraints || {};
+          return Object.entries(constraints).map(([constraintCode, constraintMessage]) => ({
+            field: e.property,
+            message: String(constraintMessage),
+            code: constraintCode,
+          }));
+        });
+        const message =
+          errorItems[0]?.message ||
+          errors
+            .map((e) => Object.values(e.constraints || {}).join(', '))
+            .filter(Boolean)
+            .join(', ') ||
+          'Validation failed.';
+        return new ValidationException(message, errorItems);
+      },
+    }),
+  );
+  app.useGlobalFilters(new GlobalExceptionFilter());
   app.setGlobalPrefix('v1');
   
   const config = new DocumentBuilder()
@@ -97,7 +123,7 @@ Authorization: Bearer <your-jwt-token>
   app
     .getHttpAdapter()
     .getInstance()
-    .addHook('onSend', async (request, reply, payload) => {
+    .addHook('onSend', async (_request, reply, payload) => {
       reply.header('X-Content-Type-Options', 'nosniff');
       reply.header('X-Frame-Options', 'DENY');
       reply.header('Content-Security-Policy', "default-src 'self'");

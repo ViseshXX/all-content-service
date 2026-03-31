@@ -11,13 +11,8 @@ export class CollectionService {
   ) {}
 
   async create(collection: collection): Promise<collection> {
-    try {
-      const newcollection = new this.collectionModel(collection);
-      const savedData = newcollection.save();
-      return savedData;
-    } catch (error) {
-      return error;
-    }
+    const newcollection = new this.collectionModel(collection);
+    return await newcollection.save();
   }
 
   async readAll(): Promise<collection[]> {
