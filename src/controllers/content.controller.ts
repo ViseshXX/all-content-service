@@ -963,11 +963,33 @@ export class contentController {
   @Post('/getContent')
   async getContent(@Res() response: FastifyReply, @Body() queryData: any) {
     try {
+      this.logger.log(
+        JSON.stringify({
+          api: 'content.getContent',
+          stage: 'start',
+          language: queryData?.language,
+          contentType: queryData?.contentType,
+          story_mode: queryData?.story_mode,
+          mechanics_id: queryData?.mechanics_id ?? null,
+          limit: queryData?.limit,
+          tagsType: Array.isArray(queryData?.tags) ? 'array' : typeof queryData?.tags,
+        }),
+      );
       const Batch: any = queryData.limit || 5;
       let contentCollection;
       let collectionId;
 
       const tags = queryData.language === 'en' ? en_config.tags : common_config.tags;
+            // Guard and log tags evaluation
+      const incomingTags: string[] = Array.isArray(queryData?.tags) ? queryData.tags : [];
+      this.logger.debug(
+        JSON.stringify({
+          api: 'content.getContent',
+          stage: 'tags-eval',
+          tagsConfiguredCount: Array.isArray(tags) ? tags.length : null,
+          incomingTagsCount: incomingTags.length,
+        }),
+      );
 
       if (tags.some(tag => queryData.tags.some(qtag => qtag.includes(tag)))) {
         queryData.cLevel = "";
@@ -975,17 +997,37 @@ export class contentController {
         queryData.graphemesMappedObj = {};
         queryData.level_competency = [];
         queryData.tokenArr = [];
+        this.logger.debug(
+          JSON.stringify({
+            api: 'content.getContent',
+            stage: 'tags-reset-applied',
+          }),
+        );
       }
 
       if (
         queryData.story_mode === 'true' &&
         queryData.level_competency.length > 0
       ) {
+        this.logger.log(
+          JSON.stringify({
+            api: 'content.getContent',
+            stage: 'story-mode-branch',
+            level_competency_count: Array.isArray(queryData?.level_competency) ? queryData.level_competency.length : 0,
+          }),
+        );
         collectionId = await this.collectionService.getCompetencyCollections(
           queryData.level_competency,
           queryData.language,
           queryData.contentType,
           queryData.CEFR_level,
+        );
+        this.logger.debug(
+          JSON.stringify({
+            api: 'content.getContent',
+            stage: 'got-collectionId',
+            collectionId,
+          }),
         );
         const contentData = await this.contentService.pagination(
           0,
@@ -993,9 +1035,23 @@ export class contentController {
           queryData.contentType,
           collectionId,
         );
+        this.logger.debug(
+          JSON.stringify({
+            api: 'content.getContent',
+            stage: 'pagination-done',
+            items: Array.isArray(contentData?.data) ? contentData.data.length : null,
+          }),
+        );
         let contentArr = contentData['data'];
 
         if (contentArr.length === 0) {
+          this.logger.debug(
+            JSON.stringify({
+              api: 'content.getContent',
+              stage: 'fallback-search',
+              reason: 'empty-pagination',
+            }),
+          );
           await this.contentService
             .search(
               queryData.tokenArr,
@@ -1011,10 +1067,25 @@ export class contentController {
             )
             .then((contentData) => {
               contentArr = contentData['wordsArr'];
+              this.logger.debug(
+                JSON.stringify({
+                  api: 'content.getContent',
+                  stage: 'fallback-search-done',
+                  words: Array.isArray(contentArr) ? contentArr.length : null,
+                }),
+              );
             });
         }
 
         if (queryData.mechanics_id !== undefined) {
+          this.logger.debug(
+            JSON.stringify({
+              api: 'content.getContent',
+              stage: 'mechanics-filter-on-story',
+              mechanics_id: queryData.mechanics_id,
+              itemsBefore: Array.isArray(contentArr) ? contentArr.length : null,
+            }),
+          );
           contentArr.map((content) => {
             const { mechanics_data } = content;
             if (mechanics_data) {
@@ -1025,12 +1096,32 @@ export class contentController {
               content.mechanics_data.push(mechanicData);
             }
           });
+          this.logger.debug(
+            JSON.stringify({
+              api: 'content.getContent',
+              stage: 'mechanics-filter-complete',
+            }),
+          );
         }
 
         contentCollection = { wordsArr: contentArr };
+        this.logger.log(
+          JSON.stringify({
+            api: 'content.getContent',
+            stage: 'story-mode-branch-exit',
+            words: Array.isArray(contentCollection?.wordsArr) ? contentCollection.wordsArr.length : null,
+          }),
+        );
       }
 
       if (queryData.mechanics_id === undefined && collectionId === undefined) {
+        this.logger.log(
+          JSON.stringify({
+            api: 'content.getContent',
+            stage: 'search-branch',
+            limitParsed: parseInt(Batch.limit || Batch),
+          }),
+        );
         contentCollection = await this.contentService.search(
           queryData.tokenArr,
           queryData.language,
@@ -1043,7 +1134,22 @@ export class contentController {
           queryData.level_competency,
           queryData.CEFR_level,
         );
+        this.logger.log(
+          JSON.stringify({
+            api: 'content.getContent',
+            stage: 'search-branch-exit',
+            words: Array.isArray(contentCollection?.wordsArr) ? contentCollection.wordsArr.length : null,
+          }),
+        );
       } else {
+        this.logger.log(
+          JSON.stringify({
+            api: 'content.getContent',
+            stage: 'mechanics-branch',
+            mechanics_id: queryData.mechanics_id,
+            limitParsed: parseInt(Batch.limit || Batch),
+          }),
+        );
         contentCollection = await this.contentService.getMechanicsContentData(
           queryData.contentType,
           queryData.mechanics_id,
@@ -1053,10 +1159,24 @@ export class contentController {
           queryData.tags,
           queryData.CEFR_level,
         );
+        this.logger.log(
+          JSON.stringify({
+            api: 'content.getContent',
+            stage: 'mechanics-branch-exit',
+            words: Array.isArray(contentCollection?.wordsArr) ? contentCollection.wordsArr.length : null,
+          }),
+        );
       }
 
       // Enhance data with multilingual information for imageAudioMap
       if (contentCollection?.wordsArr?.length > 0) {
+        this.logger.debug(
+          JSON.stringify({
+            api: 'content.getContent',
+            stage: 'multilingual-enhance-start',
+            words: contentCollection.wordsArr.length,
+          }),
+        );
         const enhancedWordsArr = await Promise.all(
           contentCollection.wordsArr.map(async (item) => {
             // Handle mechanics_data multilingual enhancement (existing functionality)
@@ -1070,6 +1190,13 @@ export class contentController {
                   )];
 
                   if (multilingualIds.length > 0) {
+                    this.logger.verbose(
+                      JSON.stringify({
+                        api: 'content.getContent',
+                        stage: 'multilingual-fetch-mechanics',
+                        multilingualIdsCount: multilingualIds.length,
+                      }),
+                    );
                     const multilingualData = await this.contentService.getMultilingualDataByIds(multilingualIds as string[]);
                     const multilingualMap = {};
                     multilingualData?.forEach(ml => {
@@ -1099,6 +1226,13 @@ export class contentController {
               
               if (sourceData?.multilingual_id && Array.isArray(sourceData.multilingual_id)) {
                 // Fetch multilingual data for all multilingual_ids at once
+                this.logger.verbose(
+                  JSON.stringify({
+                    api: 'content.getContent',
+                    stage: 'multilingual-fetch-contentSourceData',
+                    multilingualIdsCount: Array.isArray(sourceData.multilingual_id) ? sourceData.multilingual_id.length : 0,
+                  }),
+                );
                 const multilingualDocs = await this.contentService.getMultilingualDataByIds(sourceData.multilingual_id);
                 
                 // Structure the multilingual data
@@ -1117,6 +1251,13 @@ export class contentController {
         );
 
         contentCollection.wordsArr = enhancedWordsArr;
+        this.logger.debug(
+          JSON.stringify({
+            api: 'content.getContent',
+            stage: 'multilingual-enhance-end',
+            words: Array.isArray(contentCollection?.wordsArr) ? contentCollection.wordsArr.length : null,
+          }),
+        );
       }
 
       return response.status(HttpStatus.CREATED).send({
@@ -1124,6 +1265,15 @@ export class contentController {
         data: contentCollection,
       });
     } catch (error) {
+      this.logger.error(
+        JSON.stringify({
+          api: 'content.getContent',
+          stage: 'error',
+          message: error?.message,
+          name: error?.name,
+          stack: error?.stack,
+        }),
+      );
       throw error;
     }
   }

@@ -18,6 +18,12 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const response = ctx.getResponse<FastifyReply>();
     const request = ctx.getRequest<FastifyRequest>();
 
+    // Best-effort details about the raw exception for diagnostics
+    const rawError: any = exception as any;
+    const errName = rawError?.name || 'Error';
+    const errMessage = rawError?.message || 'Unhandled exception';
+    const errStack = rawError?.stack;
+
     const statusCode =
       exception instanceof HttpException
         ? exception.getStatus()
@@ -49,6 +55,13 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       randomUUID();
     const timestamp = new Date().toISOString();
 
+    // Log raw error stack first (helps quickly pinpoint source)
+    if (errStack) {
+      this.logger.error(errStack);
+    } else {
+      this.logger.error(`${errName}: ${errMessage}`);
+    }
+
     this.logger.error(
       JSON.stringify({
         timestamp,
@@ -61,6 +74,10 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         error_type: errorType,
         code,
         errors,
+        exception: {
+          name: errName,
+          message: errMessage,
+        },
       }),
     );
 
