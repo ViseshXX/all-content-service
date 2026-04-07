@@ -851,7 +851,7 @@ export class contentService {
       }
 
       // remove all criteria and get random content with content type
-      if (contentData.length <= limit) {
+      if (contentData.length < limit) {
         let randomContentQuery = {
           contentSourceData: {
             $elemMatch: {},
@@ -1194,7 +1194,7 @@ export class contentService {
         });
 
       // Add limit*2 tokens for search
-      if (contentData.length <= limit) {
+      if (contentData.length < limit) {
         tokenArr.concat(nextTokenArr);
         await this.content
           .aggregate([
@@ -1238,7 +1238,7 @@ export class contentService {
       }
 
       // Lower Syllable and Word count level
-      if (contentData.length <= limit) {
+      if (contentData.length < limit) {
         cLevelQuery = [];
 
         for (let contentLevelEle of contentLevel) {
@@ -1308,7 +1308,7 @@ export class contentService {
       }
 
       // Remove Tokens
-      if (contentData.length <= limit) {
+      if (contentData.length < limit) {
         delete query.contentSourceData.$elemMatch['phonemes'];
 
         await this.content
@@ -1353,7 +1353,7 @@ export class contentService {
       }
 
       // remove all criteria and get random content with level conpetency
-      if (contentData.length <= limit && level_competency?.length > 0) {
+      if (contentData.length < limit && level_competency?.length > 0) {
         let randomContentQuery = {
           contentSourceData: {
             $elemMatch: {},
@@ -1409,7 +1409,7 @@ export class contentService {
           });
       }
 
-      if (contentData.length <= limit) {
+      if (contentData.length < limit) {
         if (level_competency?.length > 0) {
           query['level_complexity.level_competency'] = { $exists: true };
         }
@@ -1456,7 +1456,7 @@ export class contentService {
       }
 
       // remove all criteria and get random content with content type
-      if (contentData.length <= limit) {
+      if (contentData.length < limit) {
         let randomContentQuery = {
           contentSourceData: {
             $elemMatch: {},

@@ -990,8 +990,7 @@ export class contentController {
           incomingTagsCount: incomingTags.length,
         }),
       );
-
-      if (tags.some(tag => queryData.tags.some(qtag => qtag.includes(tag)))) {
+      if (Array.isArray(tags) && queryData.tags.length !== 0 && tags.some(tag => queryData.tags.some(qtag => typeof qtag === 'string' && qtag.includes(tag)))) {
         queryData.cLevel = "";
         queryData.complexityLevel = "";
         queryData.graphemesMappedObj = {};
