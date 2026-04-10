@@ -352,7 +352,9 @@ export class contentService {
     if (typeof tags === 'string') {
       tags = tags ? tags.split(',').map(tag => tag.trim()) : [];
     }
-    
+
+    limit = Math.max(1, parseInt(String(limit), 10) || 5);
+
     let nextTokenArr = [];
     let readingComplexityLang = common_config.readingComplexityLang;
     if (tokenArr.length >= limit * 2) {
@@ -524,7 +526,7 @@ export class contentService {
           }
         });
 
-      batchLimitForEndWith = Math.abs(contentData.length - limit);
+      batchLimitForEndWith = Math.max(0, limit - contentData.length);
 
       if (tokenArr?.length > 0) {
         query.contentSourceData.$elemMatch.text = {
@@ -532,45 +534,47 @@ export class contentService {
         };
       }
 
-      await this.content
-        .aggregate([
-          {
-            $addFields: {
-              contentSourceData: {
-                $map: {
-                  input: '$contentSourceData',
-                  as: 'elem',
-                  in: {
-                    $mergeObjects: [
-                      '$$elem',
-                      {
-                        syllableCountArray: {
-                          $objectToArray: '$$elem.syllableCountMap',
+      if (batchLimitForEndWith > 0) {
+        await this.content
+          .aggregate([
+            {
+              $addFields: {
+                contentSourceData: {
+                  $map: {
+                    input: '$contentSourceData',
+                    as: 'elem',
+                    in: {
+                      $mergeObjects: [
+                        '$$elem',
+                        {
+                          syllableCountArray: {
+                            $objectToArray: '$$elem.syllableCountMap',
+                          },
                         },
-                      },
-                    ],
+                      ],
+                    },
                   },
                 },
               },
             },
-          },
-          {
-            $match: query,
-          },
-          { $sample: { size: batchLimitForEndWith } },
-        ])
-        .exec()
-        .then((doc) => {
-          for (const docEle of doc) {
-            if (
-              contentData.length == 0 ||
-              !contentDataSet.has(docEle.contentId)
-            ) {
-              contentDataSet.add(docEle.contentId);
-              contentData.push(docEle);
+            {
+              $match: query,
+            },
+            { $sample: { size: batchLimitForEndWith } },
+          ])
+          .exec()
+          .then((doc) => {
+            for (const docEle of doc) {
+              if (
+                contentData.length == 0 ||
+                !contentDataSet.has(docEle.contentId)
+              ) {
+                contentDataSet.add(docEle.contentId);
+                contentData.push(docEle);
+              }
             }
-          }
-        });
+          });
+      }
 
       // Add more targets tokens for content
       if (contentData.length < limit) {
