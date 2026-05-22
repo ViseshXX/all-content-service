@@ -13,6 +13,7 @@ import { GlobalExceptionFilter } from './common/filters/global-exception.filter'
 
 
 async function bootstrap() {
+  const appVersion = process.env.APP_VERSION ?? 'All';
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
     new FastifyAdapter(),
@@ -128,6 +129,7 @@ Authorization: Bearer <your-jwt-token>
       reply.header('X-Frame-Options', 'DENY');
       reply.header('Content-Security-Policy', "default-src 'self'");
       reply.header('X-XSS-Protection', '1; mode=block');
+      reply.header('x-app-version', appVersion);
       return payload;
     });
 
