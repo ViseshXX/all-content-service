@@ -2171,6 +2171,7 @@ export class contentService {
             mechanics_data: {
               $elemMatch: { mechanics_id: mechanics_id, language: language },
             },
+            ...(tags.length > 0 && { tags: { $all: tags } }),
           },
         },
         { $sample: { size: remainingLimit } },
