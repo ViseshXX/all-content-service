@@ -32,7 +32,7 @@ export class JwtAuthGuard implements CanActivate {
       const hash = createHash('sha256').update(secret_key).digest();
 
       //Step 2: Decrypt the Token
-      const jwtDecryptedToken = await jose.jwtDecrypt(token, hash);
+      const jwtDecryptedToken = await jose.jwtDecrypt(token, new Uint8Array(hash));
 
       if (!jwtDecryptedToken.payload.jwtSignedToken) {
         throw new Error('jwtSignedToken not found in decrypted payload');
@@ -46,8 +46,8 @@ export class JwtAuthGuard implements CanActivate {
       const verifiedToken = await jose.jwtVerify(jwtSignedToken, jwtSigninKey);
      
       // get the token status
-      const tokenStatus = await this.checkTokenStatus(verifiedToken.payload.virtual_id);
-      if (tokenStatus.token == null || tokenStatus.token !== token) {
+      const tokenStatus = await this.checkTokenStatus(verifiedToken.payload.virtual_id, token);
+      if (!tokenStatus.isActive) {
         throw new UnauthorizedException('User is logged out');
       }
       
@@ -61,20 +61,21 @@ export class JwtAuthGuard implements CanActivate {
   }
 
   // check user status
-  async checkTokenStatus(user_id: any): Promise<{ token: string }> {
+  async checkTokenStatus(user_id: any, token: string): Promise<{ isActive: boolean }> {
     try {
       const url = process.env.ALL_ORC_SERVICE_URL;
       const response = await axios.post(url, {
         user_id: user_id,
+        token: token,
       });
 
       return {
-        token: response.data?.result?.token || null,
+        isActive: response.data?.result?.isActive ?? false,
       };
     } catch (error: any) {
       console.error('Error calling token-status API:', error?.response?.data || error.message);
       return {
-        token: null,
+        isActive: false,
       };
     }
   }
