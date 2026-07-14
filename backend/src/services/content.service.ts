@@ -4,6 +4,8 @@ import { Model } from 'mongoose';
 import { content, contentDocument } from '../schemas/content.schema';
 import { multilingual, multilingualDocument } from '../schemas/multilingual.schema';
 import { HttpService } from '@nestjs/axios';
+import { lastValueFrom, map } from 'rxjs';
+import * as splitGraphemes from 'split-graphemes';
 import en_config from 'src/config/language/en';
 import common_config from 'src/config/commonConfig';
 
@@ -23,6 +25,166 @@ export class contentService {
     } catch (error) {
       return error;
     }
+  }
+
+  // ── Shared enrichment — called by both the REST controller and bulk processor ──
+
+  public async enrichContentSourceData(
+    contentSourceData: any[],
+    language: string,
+    authToken: string,
+  ): Promise<any[]> {
+    const lcSupportedLanguages = ['ta', 'ka', 'hi', 'te', 'kn'];
+
+    function getSyllableCount(text: string): number {
+      return splitGraphemes.splitGraphemes(
+        text.replace(
+          /[\u200B\u200C\u200D\uFEFF\s!@#$%^&*()_+{}\[\]:;<>,.?\/\\|~'"-=]/g,
+          '',
+        ),
+      ).length;
+    }
+
+    function countWordFrequency(t: string): Record<string, number> {
+      const words = t.toLowerCase().split(/\W+/).filter((w) => w.length > 0);
+      const freq: Record<string, number> = {};
+      words.forEach((w) => { freq[w] = (freq[w] ?? 0) + 1; });
+      return freq;
+    }
+
+    function countUniqueCharactersPerWord(sentence: string): Record<string, number> {
+      const counts: Record<string, number> = {};
+      sentence.toLowerCase().split(/\s+/).forEach((w) => {
+        counts[w] = w.replace(/\s+/g, '').split('').length;
+      });
+      return counts;
+    }
+
+    return Promise.all(
+      contentSourceData.map(async (ele) => {
+        const lang: string = ele['language'] ?? language;
+
+        if (lcSupportedLanguages.includes(lang)) {
+          const contentLanguage = lang === 'kn' ? 'ka' : lang;
+
+          if (!process.env.ALL_LC_API_URL) {
+            throw new Error(
+              `ALL_LC_API_URL is not configured. Cannot compute language-complexity enrichment for language "${contentLanguage}".`,
+            );
+          }
+
+          const url = process.env.ALL_LC_API_URL + contentLanguage;
+          const textData = {
+            request: { language_id: contentLanguage, text: ele['text'] },
+          };
+
+          let lcResponse: any;
+          try {
+            lcResponse = await lastValueFrom(
+              this.httpService
+                .post(url, JSON.stringify(textData), { headers: { 'Content-Type': 'application/json' } })
+                .pipe(map((resp) => resp.data)),
+            );
+          } catch (lcError: any) {
+            const status = lcError?.response?.status;
+            const detail = lcError?.response?.data ?? lcError?.message ?? String(lcError);
+            throw new Error(
+              `Language-complexity service unavailable for language "${contentLanguage}" (HTTP ${status ?? 'N/A'}): ${JSON.stringify(detail)}`,
+            );
+          }
+
+          const newWordMeasures = Object.entries(lcResponse.result.wordMeasures).map(
+            ([word, matrices]: [string, any]) => ({ text: word, ...matrices }),
+          );
+          delete lcResponse.result.meanWordComplexity;
+          delete lcResponse.result.totalWordComplexity;
+          delete lcResponse.result.wordComplexityMap;
+          delete lcResponse.result.syllableCount;
+          delete lcResponse.result.syllableCountMap;
+          lcResponse.result.wordMeasures = newWordMeasures;
+
+          const syllableCount = getSyllableCount(ele['text']);
+          const syllableCountMap: Record<string, number> = {};
+          for (const wordEle of ele['text'].split(' ')) {
+            syllableCountMap[wordEle] = getSyllableCount(wordEle);
+          }
+
+          if (common_config.readingComplexityLang.includes(lang)) {
+            if (!process.env.ALL_TEXT_EVAL_URL) {
+              throw new Error(
+                `ALL_TEXT_EVAL_URL is not configured. Cannot compute reading-complexity for language "${lang}".`,
+              );
+            }
+            try {
+              const rcUrl = process.env.ALL_TEXT_EVAL_URL + 'getReadingComplexity';
+              const readingComplexity = await lastValueFrom(
+                this.httpService
+                  .post(rcUrl, { language: lang, text: ele['text'] }, {
+                    headers: { 'Content-Type': 'application/json' },
+                  })
+                  .pipe(map((resp) => resp.data)),
+              );
+              lcResponse.result.readingComplexity = readingComplexity.total_score;
+            } catch (rcError: any) {
+              const status = rcError?.response?.status;
+              const detail = rcError?.response?.data ?? rcError?.message ?? String(rcError);
+              throw new Error(
+                `Reading-complexity service unavailable for language "${lang}" (HTTP ${status ?? 'N/A'}): ${JSON.stringify(detail)}`,
+              );
+            }
+          }
+
+          return { ...ele, ...lcResponse.result, syllableCount, syllableCountMap };
+
+        } else if (lang === 'en') {
+          if (!process.env.ALL_TEXT_EVAL_URL) {
+            throw new Error(
+              `ALL_TEXT_EVAL_URL is not configured. Cannot compute phoneme enrichment for English.`,
+            );
+          }
+
+          const url = process.env.ALL_TEXT_EVAL_URL + 'getPhonemes';
+          let phonemeResult: any;
+          try {
+            phonemeResult = await lastValueFrom(
+              this.httpService
+                .post(url, JSON.stringify({ text: ele['text'] }), {
+                  headers: { 'Content-Type': 'application/json' },
+                  timeout: 10000,
+                })
+                .pipe(map((resp) => resp.data)),
+            );
+          } catch (phonemeError: any) {
+            const status = phonemeError?.response?.status;
+            const detail = phonemeError?.response?.data ?? phonemeError?.message ?? String(phonemeError);
+            throw new Error(
+              `Phoneme service unavailable for English (HTTP ${status ?? 'N/A'}): ${JSON.stringify(detail)}`,
+            );
+          }
+
+          const text = ele['text'].replace(/[^\w\s]/gi, '');
+          const totalWordCount = text.split(' ').length;
+          const totalSyllableCount = text.toLowerCase().replace(/\s+/g, '').split('').length;
+
+          return {
+            ...ele,
+            ...phonemeResult,
+            wordCount: totalWordCount,
+            wordFrequency: countWordFrequency(text),
+            syllableCount: totalSyllableCount,
+            syllableCountMap: countUniqueCharactersPerWord(text),
+          };
+
+        } else {
+          return { ...ele };
+        }
+      }),
+    );
+  }
+
+  async getDistinctTags(): Promise<string[]> {
+    const tags = await this.content.distinct('tags').exec();
+    return (tags as string[]).filter(Boolean).sort();
   }
 
   async readAll(page: number, limit: number): Promise<content[]> {
@@ -48,6 +210,50 @@ export class contentService {
 
   async delete(id): Promise<any> {
     return await this.content.findByIdAndRemove(id);
+  }
+
+  async findByCollection(
+    collectionId: string,
+    language: string | string[],
+    contentType?: string,
+    limit = 20,
+    page = 1,
+    filters?: { contentId?: string[]; text?: string; tags?: string[] },
+  ): Promise<{ wordsArr: any[]; total: number }> {
+    const langArr = Array.isArray(language) ? language : [language];
+    const query: any = { collectionId, language: langArr.length === 1 ? langArr[0] : { $in: langArr } };
+    if (contentType) query.contentType = contentType;
+    if (filters?.contentId?.length) query.contentId = { $in: filters.contentId };
+    if (filters?.text) query['contentSourceData.text'] = { $regex: filters.text, $options: 'i' };
+    if (filters?.tags?.length) query.tags = { $in: filters.tags };
+    const skip = (page - 1) * limit;
+    const [data, total] = await Promise.all([
+      this.content.find(query).sort({ updatedAt: -1 }).skip(skip).limit(limit).lean(),
+      this.content.countDocuments(query),
+    ]);
+    return { wordsArr: data, total };
+  }
+
+  async findAllContent(
+    language: string | string[],
+    contentType?: string,
+    limit = 20,
+    page = 1,
+    filters?: { contentId?: string[]; collectionId?: string[]; text?: string; tags?: string[] },
+  ): Promise<{ wordsArr: any[]; total: number }> {
+    const langArr = Array.isArray(language) ? language : [language];
+    const query: any = { language: langArr.length === 1 ? langArr[0] : { $in: langArr } };
+    if (contentType) query.contentType = contentType;
+    if (filters?.contentId?.length) query.contentId = { $in: filters.contentId };
+    if (filters?.collectionId?.length) query.collectionId = { $in: filters.collectionId };
+    if (filters?.text) query['contentSourceData.text'] = { $regex: filters.text, $options: 'i' };
+    if (filters?.tags?.length) query.tags = { $in: filters.tags };
+    const skip = (page - 1) * limit;
+    const [data, total] = await Promise.all([
+      this.content.find(query).sort({ updatedAt: -1 }).skip(skip).limit(limit).lean(),
+      this.content.countDocuments(query),
+    ]);
+    return { wordsArr: data, total };
   }
 
   async pagination(skip, limit, type, collectionId) {
@@ -2228,12 +2434,48 @@ export class contentService {
     try {
       // Convert single string to array for consistent handling
       const idsArray = Array.isArray(multilingualIds) ? multilingualIds : [multilingualIds];
-      
+
       return await this.multilingual.find({
         multilingual_id: { $in: idsArray }
       }).exec();
     } catch (error) {
       throw error;
     }
+  }
+
+  async findMultilingualByContentId(contentId: string): Promise<multilingual | null> {
+    return this.multilingual.findOne({ 'multilingual.content_id': contentId }).lean();
+  }
+
+  async findAllMultilingual(
+    search?: string,
+    limit = 20,
+    page = 1,
+  ): Promise<{ items: any[]; total: number }> {
+    const query: any = search
+      ? { multilingual_id: { $regex: search, $options: 'i' } }
+      : {};
+    const skip = (page - 1) * limit;
+    const [items, total] = await Promise.all([
+      this.multilingual.find(query).sort({ updatedAt: -1 }).skip(skip).limit(limit).lean(),
+      this.multilingual.countDocuments(query),
+    ]);
+    return { items, total };
+  }
+
+  async findMultilingualById(id: string): Promise<multilingual | null> {
+    return this.multilingual.findById(id).lean();
+  }
+
+  async updateMultilingual(id: string, data: Partial<multilingual>): Promise<multilingual | null> {
+    return this.multilingual.findByIdAndUpdate(
+      id,
+      { ...data, updatedAt: new Date() },
+      { new: true },
+    ).lean();
+  }
+
+  async deleteMultilingual(id: string): Promise<multilingual | null> {
+    return this.multilingual.findByIdAndDelete(id).lean();
   }
 }

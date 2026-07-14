@@ -1,7 +1,7 @@
 import * as React from 'react'
 
 const TOAST_LIMIT = 5
-const TOAST_REMOVE_DELAY = 4000
+const TOAST_REMOVE_DELAY = 8000
 
 type ToastVariant = 'default' | 'destructive' | 'success'
 

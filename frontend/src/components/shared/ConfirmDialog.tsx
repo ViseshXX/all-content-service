@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -12,7 +13,7 @@ interface ConfirmDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   title: string
-  description: string
+  description: ReactNode
   onConfirm: () => void
   loading?: boolean
   confirmLabel?: string

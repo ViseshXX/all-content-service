@@ -343,7 +343,8 @@ Example templates for read along and mechanics content milestone wise. Please no
 - M4 to M9 (English): The multilingual_id array must contain words extracted from the text field that also exist in the separate multilingual collection.
 - M10 to M15: We are passing data inside the content_body within mechanics_data as a stringified JSON format (e.g., "content_body": "{\"level\": \"S1\"...").
 
-###M1 and M2 Practice content template
+
+### M1 and M2 Practice content template
 
 ```json
 { 
@@ -494,6 +495,16 @@ Example templates for read along and mechanics content milestone wise. Please no
         "text": "railway"
       }
     ],
+    "multilingual": {
+      "kn": {
+        "text": "ಮನುಷ್ಯ",
+        "audio_url": "367104da-9a43-4465-afe2-7cd4e069b0bf.wav"
+      },
+      "te": {
+        "text": "మనిషి",
+        "audio_url": "1610c410-1950-42f9-a758-41ac8d6c14c2.wav"
+      }
+    },
     "mechanics_data": [
       {
         "mechanics_id": "M2_L",
@@ -545,6 +556,7 @@ Example templates for read along and mechanics content milestone wise. Please no
         ]
       }
     ],
+    "imagePath": "9890153d-3c51-4153-8f58-5e92caceb9b6.png",
     "level_complexity": {
       "level": "",
       "level_competency": ""
@@ -611,6 +623,7 @@ Example templates for read along and mechanics content milestone wise. Please no
         ]
       }
     ],
+    "imagePath": "9890153d-3c51-4153-8f58-5e92caceb9b6.png",
     "level_complexity": {
       "level": "",
       "level_competency": ""
@@ -685,9 +698,131 @@ Example templates for read along and mechanics content milestone wise. Please no
     }
 ```
 
+### M4 to M6 Mech Content Template English
+```json
+{
+        "contentId": "da8972c3-c548-4836-896c-240daf511b51",
+        "collectionId": "1560b6bf-9fa5-405e-998f-c7df35cee7bf",
+        "name": "CEFR_EN_general_A1",
+        "contentType": "Sentence",
+        "contentSourceData": [
+            {
+                "language": "en",
+                "audioUrl": "da8972c3-c548-4836-896c-240daf511b51.wav",
+                "text": "There is a clock on the wall.",
+                "multilingual_id": [
+                    "clock",
+                    "wall"
+                ]
+            }
+        ],
+        "mechanics_data": [
+            {
+                "mechanics_id": "mechanic_1",
+                "text": "The clock is on the ____.",
+                "language": "en",
+                "audio_url": "1fd3fb6f-54b3-49e8-ba27-bcec0a32df25.wav",
+                "image_url": "cb4b339c-6bf4-43e4-8d3e-40e57f698247.png",
+                "options": [
+                    {
+                        "text": "wall",
+                        "audio_url": "",
+                        "image_url": "",
+                        "isAns": true
+                    },
+                    {
+                        "text": "floor",
+                        "audio_url": "",
+                        "image_url": "",
+                        "isAns": false
+                    },
+                    {
+                        "text": "table",
+                        "audio_url": "",
+                        "image_url": "",
+                        "isAns": false
+                    }
+                ],
+                "hints": {
+                    "text": "",
+                    "audio_url": "",
+                    "image_url": ""
+                },
+                "time_limit": 90
+            },
+            {
+                "mechanics_id": "mechanic_2",
+                "text": "Where is the clock?",
+                "language": "en",
+                "audio_url": "64d0d22c-ccdd-4f4b-bbc1-b023e964b124.wav",
+                "image_url": "cb4b339c-6bf4-43e4-8d3e-40e57f698247.png",
+                "options": [
+                    {
+                        "text": "On the table",
+                        "audio_url": "c5bc6115-95d0-4d8b-9e7d-4e4e97f8b58f.wav",
+                        "image_url": "",
+                        "isAns": false
+                    },
+                    {
+                        "text": "On the wall",
+                        "audio_url": "8bf4d6f2-f9a5-4e4d-8083-26b4e37cbfef.wav",
+                        "image_url": "",
+                        "isAns": true
+                    },
+                    {
+                        "text": "Under the chair",
+                        "audio_url": "a097e5a0-01ea-4649-aa71-24a77e7e99ce.wav",
+                        "image_url": "",
+                        "isAns": false
+                    }
+                ],
+                "correctness": {
+                    "50%": [
+                        "wall",
+                        "the"
+                    ]
+                },
+                "hints": {
+                    "text": "",
+                    "audio_url": "",
+                    "image_url": ""
+                },
+                "time_limit": 90
+            },
+            {
+                "mechanics_id": "mechanic_3",
+                "jumbled_text": "There is wall. the a clock on",
+                "language": "en",
+                "audio_url": "30dfcc5e-a3aa-454f-802e-85b6b6372e8a.wav",
+                "image_url": "cb4b339c-6bf4-43e4-8d3e-40e57f698247.png",
+                "hints": {
+                    "text": "",
+                    "audio_url": "",
+                    "image_url": ""
+                },
+                "time_limit": 90
+            }
+        ],
+        "level_complexity": {
+            "level": "",
+            "level_competency": "",
+            "CEFR_level": ""
+        },
+        "imagePath": "9890153d-3c51-4153-8f58-5e92caceb9b6.png",
+        "status": "live",
+        "publisher": "ekstep",
+        "language": "en",
+        "contentIndex": 1,
+        "tags": [
+            "M4_GEN-EN_MECH"
+        ],
+        "createdAt": "2025-06-13T16:01:01.771Z",
+        "updatedAt": "2025-06-13T16:01:01.771Z",
+        "__v": 0
+    }
+```
 
-
-### M4 to M6 Mech Content Template
+### M4 to M6 Mech Content Template Indic
 
 ```json
 {
@@ -788,6 +923,7 @@ Example templates for read along and mechanics content milestone wise. Please no
                 "time_limit": 90
             }
         ],
+        "imagePath": "9890153d-3c51-4153-8f58-5e92caceb9b6.png",
         "level_complexity": {
             "level": "",
             "level_competency": "",
@@ -818,10 +954,47 @@ Example templates for read along and mechanics content milestone wise. Please no
             {
                 "language": "en",
                 "audioUrl": "117b152f-29bd-4e1b-a71c-dae0e39f66f8.wav",
-                "text": "Sita was coming back from school. She stood under a tree when it started raining. How many people did she see going with an umbrella?"
+                "text": "Sita was coming back from school. She stood under a tree when it started raining. How many people did she see going with an umbrella?",
+                "multilingual_id": [
+                    "child",
+                    "sleeps"
+                ]
             }
         ],
         "mechanics_data": [
+            {
+                "mechanics_id": "mechanic_1",
+                "text": "The clock is on the ____.",
+                "language": "en",
+                "audio_url": "1fd3fb6f-54b3-49e8-ba27-bcec0a32df25.wav",
+                "image_url": "cb4b339c-6bf4-43e4-8d3e-40e57f698247.png",
+                "options": [
+                    {
+                        "text": "wall",
+                        "audio_url": "",
+                        "image_url": "",
+                        "isAns": true
+                    },
+                    {
+                        "text": "floor",
+                        "audio_url": "",
+                        "image_url": "",
+                        "isAns": false
+                    },
+                    {
+                        "text": "table",
+                        "audio_url": "",
+                        "image_url": "",
+                        "isAns": false
+                    }
+                ],
+                "hints": {
+                    "text": "",
+                    "audio_url": "",
+                    "image_url": ""
+                },
+                "time_limit": 90
+            },
             {
                 "mechanics_id": "mechanic_2",
                 "text": "Sita was coming back from school. She stood under a tree when it started raining. How many people did she see going with an umbrella?",
@@ -880,6 +1053,7 @@ Example templates for read along and mechanics content milestone wise. Please no
             "level_competency": "",
             "CEFR_level": ""
         },
+        "imagePath": "9890153d-3c51-4153-8f58-5e92caceb9b6.png",
         "status": "live",
         "publisher": "ekstep",
         "language": "en",
@@ -905,7 +1079,11 @@ Example templates for read along and mechanics content milestone wise. Please no
         {
                 "language": "en",
                 "audioUrl": "127b152f-29bd-4e1b-a71c-dae0e39f66f8.wav",
-                "text": "I enjoy a healthy breakfast with fruits and eggs."
+                "text": "I enjoy a healthy breakfast with fruits and eggs.",
+                "multilingual_id": [
+                    "child",
+                    "sleeps"
+                ]
         }
 ],
     "mechanics_data": [
@@ -930,4 +1108,52 @@ Example templates for read along and mechanics content milestone wise. Please no
     "updatedAt": "2025-08-20T04:07:17.236Z",
     "__v": 0
   }
+```
+
+### Multilingual Collection Template
+```json
+{
+    "multilingual_id": "gold",
+    "multilingual": {
+      "content_id": "d3018ecf-0457-4cc1-a4c5-cb28d817c3d3",
+      "kn": {
+        "text": "ಚಿನ್ನ",
+        "audio_url": "2b509b03-9968-47d6-ae1e-4f442fda9ac4.wav",
+        "image_url": "c9a6c86c-55fc-4d17-8135-80a3d9ead982.png"
+      },
+      "te": {
+        "text": "బంగారం",
+        "audio_url": "48a8b333-564f-4e84-ac92-efde41188a3d.wav",
+        "image_url": "c9a6c86c-55fc-4d17-8135-80a3d9ead982.png"
+      }
+    }
+  }
+```
+### Textbook Image Mechanic
+```json
+{
+    "contentId": "51bd396f-1b93-4145-8971-8774a2fa0976",
+    "collectionId": "cbad0c76-b041-4325-b8b8-2a8dcf83badb",
+    "name": "En_TB_content",
+    "contentType": "Paragraph",
+    "contentSourceData": [
+      {
+        "language": "en",
+        "audioUrl": "51bd396f-1b93-4145-8971-8774a2fa0976.wav",
+        "text": "Badal’s mother was worried when he did not come home in time. Moti too was waiting at the gate. Badal’s mother gathered the neighbours to help search for him. Moti too accompanied them.",
+        "multilingual_id": [
+          "time",
+          "gate"
+        ]
+      }
+    ],
+    "imagePath": "51bd396f-1b93-4145-8971-8774a2fa0976.png",
+    "status": "live",
+    "publisher": "ekstep",
+    "language": "en",
+    "contentIndex": 1,
+    "tags": [
+      "CEFR_GEN_ENG_TB"
+    ]
+  },
 ```

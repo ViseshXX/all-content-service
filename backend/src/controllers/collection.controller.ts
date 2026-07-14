@@ -7,6 +7,7 @@ import {
   Param,
   Post,
   Put,
+  Req,
   Res,
   UseGuards,
 } from '@nestjs/common';
@@ -25,13 +26,17 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/auth/auth.guard';
+import { AuditLogService } from 'src/services/audit-log.service';
 
 @ApiTags('collection')
 @ApiBearerAuth('access-token')
 @Controller('collection')
 @UseGuards(JwtAuthGuard)
 export class CollectionController {
-  constructor(private readonly CollectionService: CollectionService) {}
+  constructor(
+    private readonly CollectionService: CollectionService,
+    private readonly auditLogService: AuditLogService,
+  ) {}
 
   @ApiOperation({
     summary: 'Create a new collection',
@@ -128,9 +133,19 @@ export class CollectionController {
     },
   })
   @Post()
-  async create(@Res() response: FastifyReply, @Body() collection: collection) {
+  async create(@Req() request: any, @Res() response: FastifyReply, @Body() collection: collection) {
     try {
       const newCollection = await this.CollectionService.create(collection);
+      if (request.user) {
+        this.auditLogService.log({
+          action: 'CREATE',
+          resource: 'collection',
+          resourceId: (newCollection as any).collectionId,
+          actor: { virtualId: request.user.virtual_id, username: request.user.username, role: request.user.role },
+          summary: `Created collection '${collection.name}'`,
+          ipAddress: request.ip,
+        });
+      }
       return response.status(HttpStatus.CREATED).send({
         status: 'success',
         data: newCollection,
@@ -413,11 +428,23 @@ export class CollectionController {
   })
   @Put('/:id')
   async update(
+    @Req() request: any,
     @Res() response: FastifyReply,
     @Param('id') id,
     @Body() collection: collection,
   ) {
     const updated = await this.CollectionService.update(id, collection);
+    if (request.user) {
+      this.auditLogService.log({
+        action: 'UPDATE',
+        resource: 'collection',
+        resourceId: (updated as any)?.collectionId ?? id,
+        resourceName: collection.name,
+        actor: { virtualId: request.user.virtual_id, username: request.user.username, role: request.user.role },
+        summary: `Updated collection '${collection.name}'`,
+        ipAddress: request.ip,
+      });
+    }
     return response.status(HttpStatus.OK).send({
       updated,
     });
@@ -483,8 +510,19 @@ export class CollectionController {
     },
   })
   @Delete('/:id')
-  async delete(@Res() response: FastifyReply, @Param('id') id) {
+  async delete(@Req() request: any, @Res() response: FastifyReply, @Param('id') id) {
     const deleted = await this.CollectionService.delete(id);
+    if (request.user) {
+      this.auditLogService.log({
+        action: 'DELETE',
+        resource: 'collection',
+        resourceId: (deleted as any)?.collectionId ?? id,
+        resourceName: (deleted as any)?.name,
+        actor: { virtualId: request.user.virtual_id, username: request.user.username, role: request.user.role },
+        summary: `Deleted collection '${(deleted as any)?.name ?? id}'`,
+        ipAddress: request.ip,
+      });
+    }
     return response.status(HttpStatus.OK).send({
       deleted,
     });

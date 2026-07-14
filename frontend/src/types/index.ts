@@ -1,6 +1,60 @@
 export type ContentType = 'Word' | 'Sentence' | 'Paragraph' | 'Char'
-export type Language = 'en' | 'hi' | 'ta' | 'te' | 'kn' | 'gu'
+export type Language = 'en' | 'hi' | 'ta' | 'te' | 'kn' | 'gu' | 'ma'
 export type Status = 'live' | 'draft'
+
+// ── Bulk Upload Types ────────────────────────────────────────────────────────
+
+export type TemplateType =
+  | 'M1 to M2 Read Along Content'
+  | 'M3 Read Along Content'
+  | 'M4 to M6 Read Along Content'
+  | 'M7 to M9 Read Along Content'
+  | 'Textbook image mechanic'
+  | 'M1 Mechanics Content'
+  | 'M2 Mechanics Content'
+  | 'M3 Mechanics Content'
+  | 'M4 to M6 Mechanics Content'
+  | 'M7 to M9 Mechanics Content'
+  | 'M10 to M15 Mechanics Content'
+  | 'Collection'
+  | 'Multilingual'
+
+export type WizardAction = 'CREATE' | 'UPDATE'
+
+export interface WizardConfig {
+  action: WizardAction
+  templateType: TemplateType
+  collectionId: string
+  language: Language
+  tags: string[]
+  status: Status
+  publisher: string
+  target_lang_code: string
+}
+
+export type JobStatusEnum = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED'
+
+export interface FailedRowDetail {
+  rowIndex: number
+  sheetName: string
+  error: string
+}
+
+export interface JobStatus {
+  jobId: string
+  status: JobStatusEnum
+  templateType?: string | null
+  totalRows: number
+  processedRows: number
+  failedRows: number
+  resumeCount: number
+  errorMessage?: string
+  failedRowDetails: FailedRowDetail[]
+  resultCollectionId?: string | null
+  resultCollectionName?: string | null
+  createdAt?: string
+  updatedAt?: string
+}
 
 export interface ContentSourceDataItem {
   language: Language
@@ -64,6 +118,7 @@ export interface Content {
   contentType: ContentType
   language: Language
   status: Status
+  reviewStatus?: string
   tags: string[]
   contentSourceData: ContentSourceDataItem[]
   mechanics_data?: MechanicsEntry[]
@@ -92,6 +147,20 @@ export interface Collection {
   difficultyLevel?: string
   ageGroup?: string
   level_complexity?: LevelComplexity
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface MultilingualLangData {
+  text?: string
+  audio_url?: string
+  image_url?: string
+}
+
+export interface MultilingualEntry {
+  _id: string
+  multilingual_id: string
+  multilingual: Record<string, MultilingualLangData> & { content_id?: string }
   createdAt?: string
   updatedAt?: string
 }

@@ -17,13 +17,65 @@ apiClient.interceptors.request.use((config) => {
   return config
 })
 
+// ---------- token refresh logic ----------
+let isRefreshing = false
+let refreshQueue: Array<(token: string) => void> = []
+
+function doLogout() {
+  localStorage.removeItem('auth_token')
+  localStorage.removeItem('auth_user')
+  window.location.href = '/login'
+}
+
 apiClient.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      // Dispatch a custom event so Toaster can show a message
-      window.dispatchEvent(new CustomEvent('auth:unauthorized'))
+  async (error) => {
+    const url: string = error.config?.url ?? ''
+
+    // Only intercept 401s from protected endpoints
+    if (
+      error.response?.status !== 401 ||
+      url.includes('/auth/login') ||
+      url.includes('/auth/refresh')
+    ) {
+      return Promise.reject(error)
     }
-    return Promise.reject(error)
-  }
+
+    // If a refresh is already in progress, queue this request
+    if (isRefreshing) {
+      return new Promise((resolve) => {
+        refreshQueue.push((newToken: string) => {
+          error.config.headers.Authorization = `Bearer ${newToken}`
+          resolve(apiClient(error.config))
+        })
+      })
+    }
+
+    isRefreshing = true
+    const expiredToken = localStorage.getItem('auth_token')
+
+    try {
+      const res = await axios.post(
+        `${BASE_URL}/auth/refresh`,
+        {},
+        { headers: { Authorization: `Bearer ${expiredToken}` } },
+      )
+      const newToken: string = res.data.data.token
+      localStorage.setItem('auth_token', newToken)
+
+      // Retry all queued requests with the new token
+      refreshQueue.forEach((cb) => cb(newToken))
+      refreshQueue = []
+
+      // Retry the original failed request
+      error.config.headers.Authorization = `Bearer ${newToken}`
+      return apiClient(error.config)
+    } catch {
+      refreshQueue = []
+      doLogout()
+      return Promise.reject(error)
+    } finally {
+      isRefreshing = false
+    }
+  },
 )

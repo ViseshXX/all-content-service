@@ -16,6 +16,11 @@ async function bootstrap() {
     new FastifyAdapter(),
   );
 
+  // Register @fastify/multipart for bulk-upload endpoint (100 MB limit)
+  await app.register(require('@fastify/multipart') as any, {
+    limits: { fileSize: 100 * 1024 * 1024 },
+  });
+
   app.useGlobalPipes(new ValidationPipe());
   app.setGlobalPrefix('v1');
   

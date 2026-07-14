@@ -4,9 +4,20 @@ import { useFormContext } from 'react-hook-form'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
-export function LevelComplexityField({ prefix = 'level_complexity' }: { prefix?: string }) {
+function d(isDirty: boolean, isEditMode: boolean) {
+  return isEditMode && isDirty ? 'border-l-2 border-red-400 pl-2 bg-red-100 rounded-sm' : ''
+}
+
+export function LevelComplexityField({
+  prefix = 'level_complexity',
+  isEditMode = false,
+}: {
+  prefix?: string
+  isEditMode?: boolean
+}) {
   const [open, setOpen] = React.useState(false)
-  const { register } = useFormContext()
+  const { register, formState: { dirtyFields } } = useFormContext()
+  const lc = (dirtyFields as any).level_complexity ?? {}
 
   return (
     <div className="border rounded-md">
@@ -20,15 +31,15 @@ export function LevelComplexityField({ prefix = 'level_complexity' }: { prefix?:
       </button>
       {open && (
         <div className="border-t px-4 py-4 grid grid-cols-3 gap-4">
-          <div className="space-y-1">
+          <div className={`space-y-1 ${d(!!lc.level, isEditMode)}`}>
             <Label>Level</Label>
             <Input placeholder="e.g. L1" {...register(`${prefix}.level`)} />
           </div>
-          <div className="space-y-1">
+          <div className={`space-y-1 ${d(!!lc.level_competency, isEditMode)}`}>
             <Label>Level Competency</Label>
             <Input placeholder="e.g. C1" {...register(`${prefix}.level_competency`)} />
           </div>
-          <div className="space-y-1">
+          <div className={`space-y-1 ${d(!!lc.CEFR_level, isEditMode)}`}>
             <Label>CEFR Level</Label>
             <Input placeholder="e.g. A1" {...register(`${prefix}.CEFR_level`)} />
           </div>

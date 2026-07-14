@@ -5,6 +5,7 @@ import {
   createContent,
   updateContent,
   deleteContent,
+  createContentWithAssets,
   type ContentListParams,
   type ContentPayload,
 } from '@/api/content'
@@ -52,6 +53,29 @@ export function useUpdateContent() {
     },
     onError: (err: unknown) => {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Failed to update content'
+      toast({ title: 'Error', description: msg, variant: 'destructive' })
+    },
+  })
+}
+
+export function useCreateContentWithAssets() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      templateType,
+      fields,
+      files,
+    }: {
+      templateType: string
+      fields: Record<string, string>
+      files: Record<string, File>
+    }) => createContentWithAssets(templateType, fields, files),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['content', 'list'] })
+      toast({ title: 'Content created', variant: 'success' })
+    },
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Failed to create content'
       toast({ title: 'Error', description: msg, variant: 'destructive' })
     },
   })

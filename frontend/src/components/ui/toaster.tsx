@@ -19,7 +19,11 @@ export function Toaster() {
         >
           <div className="flex-1 text-sm">
             {t.title && <p className="font-semibold">{t.title}</p>}
-            {t.description && <p className="mt-0.5 text-muted-foreground">{t.description}</p>}
+            {t.description && (
+              <p className={cn('mt-0.5', t.variant === 'destructive' ? 'opacity-90' : 'text-muted-foreground')}>
+                {t.description}
+              </p>
+            )}
           </div>
           <button onClick={() => dismiss(t.id)} className="shrink-0 opacity-70 hover:opacity-100">
             <X className="h-4 w-4" />

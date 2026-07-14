@@ -6,16 +6,20 @@ import {
   Inject,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
 import axios from 'axios';
 import { createHash } from 'crypto';
 import { Request } from 'express';
 import * as jose from 'jose';
+import { CmsUser, CmsUserDocument } from 'src/schemas/cms-user.schema';
 
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
   constructor(
-    private jwtService: JwtService
+    private jwtService: JwtService,
+    @InjectModel(CmsUser.name) private cmsUserModel: Model<CmsUserDocument>,
   ) { }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -51,12 +55,26 @@ export class JwtAuthGuard implements CanActivate {
      
       // get the token status
       const tokenStatus = await this.checkTokenStatus(verifiedToken.payload.virtual_id);
-      if (tokenStatus.token == null || tokenStatus.token !== token) {
+      if (tokenStatus.serviceUnavailable) {
+        // Orchestration is temporarily unreachable — trust the verified JWT rather than logging the user out
+        console.warn('[AUTH] Orchestration tokenStatus unavailable — allowing request based on verified JWT');
+      } else if (tokenStatus.token == null || tokenStatus.token !== token) {
         throw new UnauthorizedException('User is logged out');
       }
       
-      //Step 4: Attach User Data to Request
-      (request as any).user = verifiedToken.payload;
+      //Step 4: Look up user in cms_users and attach enriched data to request
+      const virtualId = verifiedToken.payload.virtual_id;
+      const cmsUser = await this.cmsUserModel.findOne({ virtualId, isActive: true }).lean();
+      if (!cmsUser) {
+        throw new UnauthorizedException('User not found or deactivated');
+      }
+
+      (request as any).user = {
+        ...verifiedToken.payload,
+        virtual_id: virtualId,
+        username: cmsUser.username,
+        role: cmsUser.role,
+      };
 
       return true;
     } catch (err) {
@@ -65,7 +83,7 @@ export class JwtAuthGuard implements CanActivate {
   }
 
   // check user status
-  async checkTokenStatus(user_id: any): Promise<{ token: string }> {
+  async checkTokenStatus(user_id: any): Promise<{ token: string | null; serviceUnavailable?: boolean }> {
     try {
       const url = process.env.ALL_ORC_SERVICE_URL;
       const response = await axios.post(url, {
@@ -76,10 +94,9 @@ export class JwtAuthGuard implements CanActivate {
         token: response.data?.result?.token || null,
       };
     } catch (error: any) {
-      console.error('Error calling token-status API:', error?.response?.data || error.message);
-      return {
-        token: null,
-      };
+      // Network / timeout error — orchestration is unreachable, not the same as "logged out"
+      console.error('Error calling tokenStatus API:', error?.response?.data || error.message);
+      return { token: null, serviceUnavailable: true };
     }
   }
 

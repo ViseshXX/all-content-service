@@ -1,6 +1,8 @@
 import { useParams, useLocation, useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { ContentForm, type ContentFormValues } from '@/components/content/ContentForm'
 import { useUpdateContent } from '@/hooks/useContent'
+import { fetchMultilingualByContentId } from '@/api/multilingual'
 import type { Content } from '@/types'
 
 export function EditContentPage() {
@@ -9,6 +11,12 @@ export function EditContentPage() {
   const navigate = useNavigate()
   const content = location.state?.content as Content | undefined
   const updateMutation = useUpdateContent()
+
+  const { data: multilingualEntry } = useQuery({
+    queryKey: ['multilingual-by-content', content?.contentId],
+    queryFn: () => fetchMultilingualByContentId(content!.contentId),
+    enabled: !!content?.contentId,
+  })
 
   // Determine mode from existing data
   const mode =
@@ -33,8 +41,13 @@ export function EditContentPage() {
       <div>
         <h1 className="text-2xl font-bold">Edit Content</h1>
         <p className="text-muted-foreground text-sm mt-1">
-          ID: <code className="font-mono text-xs">{content.contentId}</code>
+          ID: <code className="font-mono text-xs">{content._id}</code>
         </p>
+        {multilingualEntry?.multilingual_id && (
+          <p className="text-muted-foreground text-sm mt-0.5">
+            Multilingual ID: <code className="font-mono text-xs">{multilingualEntry.multilingual_id}</code>
+          </p>
+        )}
       </div>
       <ContentForm
         mode={mode}

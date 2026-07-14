@@ -8,6 +8,7 @@ import {
   Post,
   Put,
   Query,
+  Req,
   Res,
   UseGuards,
 } from '@nestjs/common';
@@ -16,7 +17,6 @@ import { CollectionService } from '../services/collection.service';
 import { FastifyReply } from 'fastify';
 import { HttpService } from '@nestjs/axios';
 import { lastValueFrom, map } from 'rxjs';
-import * as splitGraphemes from 'split-graphemes';
 import {
   ApiBearerAuth,
   ApiBody,
@@ -29,9 +29,28 @@ import {
   ApiUnauthorizedResponse,
   ApiParam,
 } from '@nestjs/swagger';
+import * as path from 'path';
+import { v4 as uuidv4 } from 'uuid';
 import { JwtAuthGuard } from 'src/auth/auth.guard';
+import { AuditLogService } from 'src/services/audit-log.service';
+import { AssetPipelineService } from 'src/services/asset-pipeline.service';
+import { SingleContentAssetService, ReadAlongTemplateType } from 'src/services/single-content-asset.service';
 import en_config from 'src/config/language/en';
 import common_config from 'src/config/commonConfig';
+
+const READ_ALONG_TEMPLATES = new Set<ReadAlongTemplateType>([
+  'M1 to M2 Read Along Content',
+  'M3 Read Along Content',
+  'M4 to M6 Read Along Content',
+  'M7 to M9 Read Along Content',
+  'Textbook image mechanic',
+  'M1 Mechanics Content',
+  'M2 Mechanics Content',
+  'M3 Mechanics Content',
+  'M4 to M6 Mechanics Content',
+  'M7 to M9 Mechanics Content',
+  'M10 to M15 Mechanics Content',
+]);
 
 @ApiTags('content')
 @ApiBearerAuth('access-token')
@@ -42,6 +61,9 @@ export class contentController {
     private readonly contentService: contentService,
     private readonly collectionService: CollectionService,
     private readonly httpService: HttpService,
+    private readonly auditLogService: AuditLogService,
+    private readonly singleContentAssetService: SingleContentAssetService,
+    private readonly assetPipelineService: AssetPipelineService,
   ) { }
 
   @ApiOperation({
@@ -147,178 +169,28 @@ export class contentController {
     },
   })
   @Post()
-  async create(@Res() response: FastifyReply, @Body() content: any) {
+  async create(@Req() request: any, @Res() response: FastifyReply, @Body() content: any) {
     try {
-      const lcSupportedLanguages = ['ta', 'ka', 'hi', 'te', 'kn'];
+      const authToken: string = request.headers?.authorization ?? '';
 
-      async function getSyllableCount(text: string): Promise<number> {
-        return splitGraphemes.splitGraphemes(
-          text.replace(
-            /[\u200B\u200C\u200D\uFEFF\s!@#$%^&*()_+{}\[\]:;<>,.?\/\\|~'"-=]/g,
-            '',
-          ),
-        ).length;
-      }
-
-      const updatedcontentSourceData = await Promise.all(
-        content.contentSourceData.map(async (contentSourceDataEle) => {
-          const lang: string = contentSourceDataEle['language'];
-
-          if (lcSupportedLanguages.includes(lang)) {
-            const contentLanguage = lang === 'kn' ? 'ka' : lang;
-
-            if (!process.env.ALL_LC_API_URL) {
-              const msg = `ALL_LC_API_URL is not configured. Cannot compute language-complexity enrichment for language "${contentLanguage}".`;
-              console.error(`[content.create] ${msg}`);
-              throw new Error(msg);
-            }
-
-            const url = process.env.ALL_LC_API_URL + contentLanguage;
-            const textData = {
-              request: { language_id: contentLanguage, text: contentSourceDataEle['text'] },
-            };
-
-            let lcResponse: any;
-            try {
-              lcResponse = await lastValueFrom(
-                this.httpService
-                  .post(url, JSON.stringify(textData), { headers: { 'Content-Type': 'application/json' } })
-                  .pipe(map((resp) => resp.data)),
-              );
-            } catch (lcError: any) {
-              const status = lcError?.response?.status;
-              const detail = lcError?.response?.data ?? lcError?.message ?? String(lcError);
-              console.error(
-                `[content.create] Language-complexity API call failed for language "${contentLanguage}" (url: ${url}).`,
-                `Status: ${status ?? 'N/A'}.`,
-                `Detail:`, detail,
-              );
-              throw new Error(
-                `Language-complexity service unavailable for language "${contentLanguage}" (HTTP ${status ?? 'N/A'}): ${JSON.stringify(detail)}`,
-              );
-            }
-
-            const newWordMeasures = Object.entries(lcResponse.result.wordMeasures).map(
-              ([word, matrices]: [string, any]) => ({ text: word, ...matrices }),
-            );
-            delete lcResponse.result.meanWordComplexity;
-            delete lcResponse.result.totalWordComplexity;
-            delete lcResponse.result.wordComplexityMap;
-            delete lcResponse.result.syllableCount;
-            delete lcResponse.result.syllableCountMap;
-            lcResponse.result.wordMeasures = newWordMeasures;
-
-            const syllableCount = await getSyllableCount(contentSourceDataEle['text']);
-            const syllableCountMap: Record<string, number> = {};
-            for (const wordEle of contentSourceDataEle['text'].split(' ')) {
-              syllableCountMap[wordEle] = await getSyllableCount(wordEle);
-            }
-
-            if (common_config.readingComplexityLang.includes(lang)) {
-              if (!process.env.ALL_TEXT_EVAL_URL) {
-                const msg = `ALL_TEXT_EVAL_URL is not configured. Cannot compute reading-complexity for language "${lang}".`;
-                console.error(`[content.create] ${msg}`);
-                throw new Error(msg);
-              }
-              try {
-                const rcUrl = process.env.ALL_TEXT_EVAL_URL + 'getReadingComplexity';
-                const readingComplexity = await lastValueFrom(
-                  this.httpService
-                    .post(rcUrl, { language: lang, text: contentSourceDataEle['text'] }, {
-                      headers: { 'Content-Type': 'application/json' },
-                    })
-                    .pipe(map((resp) => resp.data)),
-                );
-                lcResponse.result.readingComplexity = readingComplexity.total_score;
-              } catch (rcError: any) {
-                const status = rcError?.response?.status;
-                const detail = rcError?.response?.data ?? rcError?.message ?? String(rcError);
-                console.error(
-                  `[content.create] Reading-complexity API call failed for language "${lang}".`,
-                  `Status: ${status ?? 'N/A'}.`,
-                  `Detail:`, detail,
-                );
-                throw new Error(
-                  `Reading-complexity service unavailable for language "${lang}" (HTTP ${status ?? 'N/A'}): ${JSON.stringify(detail)}`,
-                );
-              }
-            }
-
-            return {
-              ...contentSourceDataEle,
-              ...lcResponse.result,
-              syllableCount,
-              syllableCountMap,
-            };
-
-          } else if (lang === 'en') {
-            if (!process.env.ALL_TEXT_EVAL_URL) {
-              const msg = `ALL_TEXT_EVAL_URL is not configured. Cannot compute phoneme enrichment for English.`;
-              console.error(`[content.create] ${msg}`);
-              throw new Error(msg);
-            }
-
-            const url = process.env.ALL_TEXT_EVAL_URL + 'getPhonemes';
-            let phonemeResult: any;
-            try {
-              phonemeResult = await lastValueFrom(
-                this.httpService
-                  .post(url, JSON.stringify({ text: contentSourceDataEle['text'] }), {
-                    headers: { 'Content-Type': 'application/json' },
-                    timeout: 10000,
-                  })
-                  .pipe(map((resp) => resp.data)),
-              );
-            } catch (phonemeError: any) {
-              const status = phonemeError?.response?.status;
-              const detail = phonemeError?.response?.data ?? phonemeError?.message ?? String(phonemeError);
-              console.error(
-                `[content.create] Phoneme API call failed for English (url: ${url}).`,
-                `Status: ${status ?? 'N/A'}.`,
-                `Detail:`, detail,
-              );
-              throw new Error(
-                `Phoneme service unavailable for English (HTTP ${status ?? 'N/A'}): ${JSON.stringify(detail)}`,
-              );
-            }
-
-            const text = contentSourceDataEle['text'].replace(/[^\w\s]/gi, '');
-            const totalWordCount = text.split(' ').length;
-            const totalSyllableCount = text.toLowerCase().replace(/\s+/g, '').split('').length;
-
-            function countWordFrequency(t: string): Record<string, number> {
-              const words = t.toLowerCase().split(/\W+/).filter((w) => w.length > 0);
-              const freq: Record<string, number> = {};
-              words.forEach((w) => { freq[w] = (freq[w] ?? 0) + 1; });
-              return freq;
-            }
-
-            function countUniqueCharactersPerWord(sentence: string): Record<string, number> {
-              const counts: Record<string, number> = {};
-              sentence.toLowerCase().split(/\s+/).forEach((w) => {
-                counts[w] = w.replace(/\s+/g, '').split('').length;
-              });
-              return counts;
-            }
-
-            return {
-              ...contentSourceDataEle,
-              ...phonemeResult,
-              wordCount: totalWordCount,
-              wordFrequency: countWordFrequency(text),
-              syllableCount: totalSyllableCount,
-              syllableCountMap: countUniqueCharactersPerWord(text),
-            };
-
-          } else {
-            return { ...contentSourceDataEle };
-          }
-        }),
+      content.contentSourceData = await this.contentService.enrichContentSourceData(
+        content.contentSourceData,
+        content.language,
+        authToken,
       );
 
-      content.contentSourceData = updatedcontentSourceData;
-
       const newContent = await this.contentService.create(content);
+
+      if (request.user) {
+        this.auditLogService.log({
+          action: 'CREATE',
+          resource: 'content',
+          resourceId: (newContent as any).contentId,
+          actor: { virtualId: request.user.virtual_id, username: request.user.username, role: request.user.role },
+          summary: `Created content '${content.name || (newContent as any).contentId}'`,
+          ipAddress: request.ip,
+        });
+      }
 
       return response.status(HttpStatus.CREATED).send({
         status: 'success',
@@ -331,6 +203,136 @@ export class contentController {
         status: 'error',
         message,
       });
+    }
+  }
+
+  // ── POST /content/upload-asset ──────────────────────────────────────────────
+  // Accepts multipart/form-data with a single file.
+  // Processes (WAV conversion or image compression) and uploads to S3.
+  // If existingFilename is provided the same S3 key is reused (overwrite).
+  // Returns { filename } — the stored filename (no path prefix).
+
+  @ApiExcludeEndpoint(true)
+  @Post('upload-asset')
+  async uploadAsset(@Req() request: any, @Res() response: FastifyReply): Promise<void> {
+    const fields: Record<string, string> = {};
+    let fileBuffer: Buffer | undefined;
+    let fileExt = '.mp3';
+
+    try {
+      const parts = request.parts();
+      for await (const part of parts) {
+        if (part.type === 'file') {
+          const chunks: Uint8Array[] = [];
+          for await (const chunk of part.file) chunks.push(chunk as Uint8Array);
+          fileBuffer = Buffer.concat(chunks as any);
+          fileExt = path.extname(part.filename || '.mp3') || '.mp3';
+        } else if (part.type === 'field') {
+          fields[part.fieldname] = part.value as string;
+        }
+      }
+
+      if (!fileBuffer || fileBuffer.length === 0) {
+        response.status(HttpStatus.BAD_REQUEST).send({ status: 'error', message: 'No file provided' });
+        return;
+      }
+
+      const assetType   = (fields.assetType || 'audio') as 'audio' | 'image';
+      const language    = fields.language || 'en';
+      const existing    = fields.existingFilename || '';
+      // audioFolder: 'multilingual_audios' for M1-M3 multilingual entries, otherwise defaults to all-audio-files/{lang}
+      const audioFolder = fields.audioFolder || '';
+
+      // Derive the base name from the existing filename, or generate a new UUID
+      const baseName = existing
+        ? path.basename(existing, path.extname(existing))
+        : uuidv4();
+
+      let filename: string;
+
+      if (assetType === 'image') {
+        filename = `${baseName}.png`;
+        const compressed = await this.assetPipelineService.processImageBuffer(fileBuffer);
+        await this.assetPipelineService.uploadToS3(`mechanics_images/${filename}`, compressed, 'image/png');
+      } else {
+        // audio — supports content audios (all-audio-files/{lang}/) and multilingual audios (multilingual_audios/)
+        filename = `${baseName}.wav`;
+        const s3Folder = audioFolder || `all-audio-files/${language}`;
+        const s3Key = `${s3Folder}/${filename}`;
+        await this.assetPipelineService.convertAndUploadAudio(fileBuffer, s3Key, fileExt);
+      }
+
+      response.status(HttpStatus.OK).send({ status: 'success', data: { filename } });
+    } catch (error: any) {
+      response.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+        status: 'error',
+        message: 'Asset processing failed: ' + error.message,
+      });
+    }
+  }
+
+  // ── POST /content/create-with-assets ────────────────────────────────────────
+  // Accepts multipart/form-data with template form fields + uploaded files.
+  // Creates a single content item synchronously with TTS fallback for audio.
+
+  @ApiExcludeEndpoint(true)
+  @Post('create-with-assets')
+  async createWithAssets(@Req() request: any, @Res() response: FastifyReply): Promise<void> {
+    const fields: Record<string, string> = {};
+    const files:  Record<string, { buffer: Buffer; mimetype: string; originalname: string }> = {};
+
+    try {
+      // Stream multipart parts — buffer files in memory (individual files, not ZIP)
+      const parts = request.parts();
+      for await (const part of parts) {
+        if (part.type === 'file') {
+          const rawChunks: Uint8Array[] = [];
+          for await (const chunk of part.file) rawChunks.push(chunk as Uint8Array);
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+          const fileBuffer = Buffer.concat(rawChunks as any);
+          files[part.fieldname] = {
+            buffer:       fileBuffer,
+            mimetype:     part.mimetype,
+            originalname: part.filename ?? part.fieldname,
+          };
+        } else if (part.type === 'field') {
+          fields[part.fieldname] = part.value as string;
+        }
+      }
+
+      const templateType = fields.templateType as ReadAlongTemplateType;
+      if (!templateType || !READ_ALONG_TEMPLATES.has(templateType)) {
+        response.status(HttpStatus.BAD_REQUEST).send({
+          status: 'error',
+          message: `Invalid or missing templateType. Must be one of: ${[...READ_ALONG_TEMPLATES].join(', ')}`,
+        });
+        return;
+      }
+
+      const authToken = request.headers?.authorization ?? '';
+      const newContent = await this.singleContentAssetService.createContentWithAssets(
+        templateType, fields, files, authToken,
+      );
+
+      if (request.user) {
+        this.auditLogService.log({
+          action:     'CREATE',
+          resource:   'content',
+          resourceId: (newContent as any).contentId,
+          actor:      { virtualId: request.user.virtual_id, username: request.user.username, role: request.user.role },
+          summary:    `Created content '${fields.name || (newContent as any).contentId}' via template form (${templateType})`,
+          ipAddress:  request.ip,
+        });
+      }
+
+      response.status(HttpStatus.CREATED).send({ status: 'success', data: newContent });
+    } catch (error: any) {
+      const message: string = error?.message ?? String(error);
+      console.error('[content.createWithAssets] Failed:', message);
+      const status = message.includes('required') || message.includes('not found')
+        ? HttpStatus.BAD_REQUEST
+        : HttpStatus.INTERNAL_SERVER_ERROR;
+      response.status(status).send({ status: 'error', message });
     }
   }
 
@@ -1043,18 +1045,51 @@ export class contentController {
       }
 
       if (queryData.mechanics_id === undefined && collectionId === undefined) {
-        contentCollection = await this.contentService.search(
-          queryData.tokenArr,
-          queryData.language,
-          queryData.contentType,
-          parseInt(Batch.limit || Batch),
-          queryData.tags,
-          queryData.cLevel,
-          queryData.complexityLevel,
-          queryData.graphemesMappedObj,
-          queryData.level_competency,
-          queryData.CEFR_level,
-        );
+        const limit = parseInt(Batch.limit || Batch) || 20;
+        const page  = parseInt(queryData.page)  || 1;
+        const toArr = (v: any): string[] | undefined => {
+          if (!v) return undefined;
+          const arr = Array.isArray(v) ? v : [v];
+          return arr.length ? arr : undefined;
+        };
+        const searchFilters: { contentId?: string[]; collectionId?: string[]; text?: string; tags?: string[] } = {};
+        const sid = toArr(queryData.searchContentId);
+        if (sid) searchFilters.contentId = sid;
+        if (queryData.searchText) searchFilters.text = queryData.searchText;
+        if (queryData.searchTags?.length) searchFilters.tags = queryData.searchTags;
+        if (queryData.collectionId) {
+          contentCollection = await this.contentService.findByCollection(
+            queryData.collectionId,
+            queryData.language,
+            queryData.contentType || undefined,
+            limit,
+            page,
+            Object.keys(searchFilters).length ? searchFilters : undefined,
+          );
+        } else if (queryData.page !== undefined) {
+          const scid = toArr(queryData.searchCollectionId);
+          if (scid) searchFilters.collectionId = scid;
+          contentCollection = await this.contentService.findAllContent(
+            queryData.language,
+            queryData.contentType || undefined,
+            limit,
+            page,
+            Object.keys(searchFilters).length ? searchFilters : undefined,
+          );
+        } else {
+          contentCollection = await this.contentService.search(
+            queryData.tokenArr,
+            queryData.language,
+            queryData.contentType,
+            limit,
+            queryData.tags,
+            queryData.cLevel,
+            queryData.complexityLevel,
+            queryData.graphemesMappedObj,
+            queryData.level_competency,
+            queryData.CEFR_level,
+          );
+        }
       } else {
         contentCollection = await this.contentService.getMechanicsContentData(
           queryData.contentType,
@@ -1303,6 +1338,49 @@ export class contentController {
   }
 
   @ApiExcludeEndpoint(true)
+  @ApiExcludeEndpoint(true)
+  @Get('/check-asset')
+  async checkAsset(@Res() response: FastifyReply, @Query('key') key: string) {
+    try {
+      if (!key?.trim()) {
+        return response.status(HttpStatus.BAD_REQUEST).send({ status: 'error', message: 'key is required' });
+      }
+      const exists = await this.assetPipelineService.checkAssetExists(key.trim());
+      return response.status(HttpStatus.OK).send({ status: 'success', exists });
+    } catch (error) {
+      return response.status(HttpStatus.INTERNAL_SERVER_ERROR).send({ status: 'error', message: 'Server error - ' + error });
+    }
+  }
+
+  @ApiExcludeEndpoint(true)
+  @Post('/generate-tts')
+  async generateTts(@Res() response: FastifyReply, @Body() body: { text: string; language: string; filename: string; folder: string }) {
+    try {
+      const { text, language, filename, folder } = body;
+      if (!text?.trim() || !language?.trim() || !filename?.trim() || !folder?.trim()) {
+        return response.status(HttpStatus.BAD_REQUEST).send({ status: 'error', message: 'text, language, filename and folder are required' });
+      }
+      const baseName    = filename.trim().replace(/\.wav$/i, '');
+      const wavFilename = `${baseName}.wav`;
+      const s3Key       = `${folder.trim()}/${wavFilename}`;
+      await this.assetPipelineService.synthesizeAndUploadTTS(text.trim(), language.trim(), s3Key);
+      return response.status(HttpStatus.OK).send({ status: 'success', data: { filename: wavFilename } });
+    } catch (error) {
+      return response.status(HttpStatus.INTERNAL_SERVER_ERROR).send({ status: 'error', message: 'TTS generation failed - ' + error });
+    }
+  }
+
+  @ApiExcludeEndpoint(true)
+  @Get('/tags')
+  async getDistinctTags(@Res() response: FastifyReply) {
+    try {
+      const tags = await this.contentService.getDistinctTags();
+      return response.status(HttpStatus.OK).send({ status: 'success', data: tags });
+    } catch (error) {
+      return response.status(HttpStatus.INTERNAL_SERVER_ERROR).send({ status: 'error', message: 'Server error - ' + error });
+    }
+  }
+
   @Get()
   async fetchAll(
     @Res() response: FastifyReply,
@@ -1352,6 +1430,7 @@ export class contentController {
   @ApiExcludeEndpoint(true)
   @Put('/:id')
   async update(
+    @Req() request: any,
     @Res() response: FastifyReply,
     @Param('id') id,
     @Body() content: any,
@@ -1398,6 +1477,25 @@ export class contentController {
             delete newContent.result.wordComplexityMap;
 
             newContent.result.wordMeasures = newWordMeasures;
+
+            // Calculate readingComplexity for hi/te/kn (same as enrichContentSourceData)
+            const readingComplexityLang = ['hi', 'te', 'kn'];
+            if (readingComplexityLang.includes(contentSourceDataEle['language']) && process.env.ALL_TEXT_EVAL_URL) {
+              try {
+                const rcUrl = process.env.ALL_TEXT_EVAL_URL + 'getReadingComplexity';
+                const rcResponse = await lastValueFrom(
+                  this.httpService
+                    .post(rcUrl, { language: contentSourceDataEle['language'], text: contentSourceDataEle['text'] }, {
+                      headers: { 'Content-Type': 'application/json' },
+                    })
+                    .pipe(map((resp) => resp.data)),
+                );
+                newContent.result.readingComplexity = rcResponse.total_score;
+              } catch (_rcErr) {
+                // Non-fatal: log and continue without readingComplexity
+                console.error(`[PUT /:id] getReadingComplexity failed for lang=${contentSourceDataEle['language']}`, _rcErr?.message);
+              }
+            }
 
             return { ...contentSourceDataEle, ...newContent.result };
           } else if (contentSourceDataEle['language'] === 'en') {
@@ -1490,6 +1588,18 @@ export class contentController {
       content.contentSourceData = updatedcontentSourceData;
       const updatedContent = await this.contentService.update(id, content);
 
+      if (request.user) {
+        this.auditLogService.log({
+          action: 'UPDATE',
+          resource: 'content',
+          resourceId: (updatedContent as any).contentId ?? id,
+          resourceName: content.name,
+          actor: { virtualId: request.user.virtual_id, username: request.user.username, role: request.user.role },
+          summary: `Updated content '${content.name}'`,
+          ipAddress: request.ip,
+        });
+      }
+
       return response.status(HttpStatus.OK).send({
         status: 'success',
         data: updatedContent,
@@ -1504,8 +1614,19 @@ export class contentController {
 
   @ApiExcludeEndpoint(true)
   @Delete('/:id')
-  async delete(@Res() response: FastifyReply, @Param('id') id) {
+  async delete(@Req() request: any, @Res() response: FastifyReply, @Param('id') id) {
     const deleted = await this.contentService.delete(id);
+    if (request.user) {
+      this.auditLogService.log({
+        action: 'DELETE',
+        resource: 'content',
+        resourceId: (deleted as any)?.contentId ?? id,
+        resourceName: (deleted as any)?.name,
+        actor: { virtualId: request.user.virtual_id, username: request.user.username, role: request.user.role },
+        summary: `Deleted content '${(deleted as any)?.name ?? id}'`,
+        ipAddress: request.ip,
+      });
+    }
     return response.status(HttpStatus.OK).send({
       deleted,
     });
@@ -1598,9 +1719,19 @@ export class contentController {
     },
   })
   @Post('/multilingual')
-  async createMultilingual(@Res() response: FastifyReply, @Body() multilingualData: any) {
+  async createMultilingual(@Req() request: any, @Res() response: FastifyReply, @Body() multilingualData: any) {
     try {
       const newMultilingual = await this.contentService.createMultilingual(multilingualData);
+      if (request.user) {
+        this.auditLogService.log({
+          action: 'CREATE',
+          resource: 'multilingual',
+          resourceId: multilingualData.multilingual_id,
+          actor: { virtualId: request.user.virtual_id, username: request.user.username, role: request.user.role },
+          summary: `Created multilingual '${multilingualData.multilingual_id}'`,
+          ipAddress: request.ip,
+        });
+      }
       return response.status(HttpStatus.CREATED).send({
         status: 'success',
         data: newMultilingual
@@ -1609,6 +1740,139 @@ export class contentController {
       return response.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
         status: 'error',
         message: 'Server error - ' + error.message
+      });
+    }
+  }
+
+  @Get('/multilingual')
+  async listMultilingual(
+    @Res() response: FastifyReply,
+    @Query('search') search?: string,
+    @Query('limit') limit?: string,
+    @Query('page') page?: string,
+  ) {
+    try {
+      const result = await this.contentService.findAllMultilingual(
+        search || undefined,
+        limit ? parseInt(limit) : 20,
+        page ? parseInt(page) : 1,
+      );
+      return response.status(HttpStatus.OK).send({ status: 'success', data: result });
+    } catch (error) {
+      return response.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+        status: 'error',
+        message: 'Server error - ' + error.message,
+      });
+    }
+  }
+
+  @Get('/multilingual/validate')
+  async validateMultilingualWords(
+    @Res() response: FastifyReply,
+    @Query('words') words: string,
+  ) {
+    try {
+      const wordArr = (words ?? '')
+        .split(',')
+        .map((w) => w.trim().toLowerCase())
+        .filter(Boolean);
+      if (wordArr.length === 0) {
+        return response.status(HttpStatus.BAD_REQUEST).send({
+          status: 'error', message: 'At least one word is required',
+        });
+      }
+      const docs = await this.contentService.getMultilingualDataByIds(wordArr);
+      const found = new Set((docs as any[]).map((d) => d.multilingual_id?.toLowerCase()));
+      const missing = wordArr.filter((w) => !found.has(w));
+      return response.status(HttpStatus.OK).send({ status: 'success', data: { missing } });
+    } catch (error) {
+      return response.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+        status: 'error', message: 'Server error - ' + error.message,
+      });
+    }
+  }
+
+  @Get('/multilingual/by-content/:contentId')
+  async getMultilingualByContentId(@Res() response: FastifyReply, @Param('contentId') contentId: string) {
+    try {
+      const item = await this.contentService.findMultilingualByContentId(contentId);
+      return response.status(HttpStatus.OK).send({ status: 'success', data: item ?? null });
+    } catch (error) {
+      return response.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+        status: 'error',
+        message: 'Server error - ' + error.message,
+      });
+    }
+  }
+
+  @Get('/multilingual/:id')
+  async getMultilingualById(@Res() response: FastifyReply, @Param('id') id: string) {
+    try {
+      const item = await this.contentService.findMultilingualById(id);
+      if (!item) {
+        return response.status(HttpStatus.NOT_FOUND).send({ status: 'error', message: 'Not found' });
+      }
+      return response.status(HttpStatus.OK).send({ status: 'success', data: item });
+    } catch (error) {
+      return response.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+        status: 'error',
+        message: 'Server error - ' + error.message,
+      });
+    }
+  }
+
+  @Put('/multilingual/:id')
+  async updateMultilingualById(
+    @Req() request: any,
+    @Res() response: FastifyReply,
+    @Param('id') id: string,
+    @Body() body: any,
+  ) {
+    try {
+      const updated = await this.contentService.updateMultilingual(id, body);
+      if (!updated) {
+        return response.status(HttpStatus.NOT_FOUND).send({ status: 'error', message: 'Not found' });
+      }
+      if (request.user) {
+        this.auditLogService.log({
+          action: 'UPDATE',
+          resource: 'multilingual',
+          resourceId: id,
+          resourceName: (updated as any)?.multilingual_id,
+          actor: { virtualId: request.user.virtual_id, username: request.user.username, role: request.user.role },
+          summary: `Updated multilingual '${(updated as any)?.multilingual_id ?? id}'`,
+          ipAddress: request.ip,
+        });
+      }
+      return response.status(HttpStatus.OK).send({ status: 'success', data: updated });
+    } catch (error) {
+      return response.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+        status: 'error',
+        message: 'Server error - ' + error.message,
+      });
+    }
+  }
+
+  @Delete('/multilingual/:id')
+  async deleteMultilingualById(@Req() request: any, @Res() response: FastifyReply, @Param('id') id: string) {
+    try {
+      const deletedMultilingual = await this.contentService.deleteMultilingual(id);
+      if (request.user) {
+        this.auditLogService.log({
+          action: 'DELETE',
+          resource: 'multilingual',
+          resourceId: id,
+          resourceName: (deletedMultilingual as any)?.multilingual_id,
+          actor: { virtualId: request.user.virtual_id, username: request.user.username, role: request.user.role },
+          summary: `Deleted multilingual '${(deletedMultilingual as any)?.multilingual_id ?? id}'`,
+          ipAddress: request.ip,
+        });
+      }
+      return response.status(HttpStatus.OK).send({ status: 'success', message: 'Deleted' });
+    } catch (error) {
+      return response.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
+        status: 'error',
+        message: 'Server error - ' + error.message,
       });
     }
   }

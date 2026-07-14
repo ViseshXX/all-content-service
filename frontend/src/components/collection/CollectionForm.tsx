@@ -1,4 +1,6 @@
 import { useForm, Controller } from 'react-hook-form'
+import { AssetUploadField, hasPendingAssetChanges, flushPendingUploads } from '@/components/content/AssetUploadField'
+import { toast } from '@/hooks/use-toast'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useNavigate } from 'react-router-dom'
@@ -23,7 +25,7 @@ import { ChevronDown, ChevronRight } from 'lucide-react'
 const collectionFormSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   category: z.enum(['Word', 'Sentence', 'Paragraph', 'Char']),
-  language: z.enum(['en', 'hi', 'ta', 'te', 'kn', 'gu']),
+  language: z.enum(['en', 'hi', 'ta', 'te', 'kn', 'gu', 'ma', 'or']),
   status: z.enum(['live', 'draft']),
   tags: z.array(z.string()).min(1, 'At least one tag is required'),
   description: z.string().optional(),
@@ -60,6 +62,7 @@ export function CollectionForm({ defaultValues, onSubmit, isSubmitting }: Collec
     handleSubmit,
     watch,
     setValue,
+    getValues,
     formState: { errors },
   } = useForm<CollectionFormValues>({
     resolver: zodResolver(collectionFormSchema),
@@ -87,6 +90,25 @@ export function CollectionForm({ defaultValues, onSubmit, isSubmitting }: Collec
   const tags = watch('tags')
 
   async function handleFormSubmit(data: CollectionFormValues) {
+    if (hasPendingAssetChanges()) {
+      toast({
+        title: 'Unsaved asset changes',
+        description: 'The image filename was changed but no file was uploaded. Please upload before saving.',
+        variant: 'destructive',
+      })
+      return
+    }
+    try {
+      await flushPendingUploads()
+      data = getValues()
+    } catch (err: any) {
+      toast({
+        title: 'Upload failed',
+        description: err?.response?.data?.message ?? err?.message ?? 'File upload failed. Please try again.',
+        variant: 'destructive',
+      })
+      return
+    }
     const cleaned = { ...data }
     if (!cleaned.description) delete cleaned.description
     if (!cleaned.author) delete cleaned.author
@@ -113,6 +135,13 @@ export function CollectionForm({ defaultValues, onSubmit, isSubmitting }: Collec
           <CardTitle>Collection Details</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {defaultValues?.collectionId && (
+            <div className="space-y-1">
+              <Label>Collection ID (read-only)</Label>
+              <Input value={defaultValues.collectionId} readOnly className="bg-muted text-muted-foreground font-mono" />
+            </div>
+          )}
+
           <div className="space-y-1">
             <Label>Name *</Label>
             <Input placeholder="e.g. Grade 2 English Chapter 3" {...register('name')} />
@@ -209,7 +238,18 @@ export function CollectionForm({ defaultValues, onSubmit, isSubmitting }: Collec
             </div>
             <div className="space-y-1">
               <Label>Image Path</Label>
-              <Input placeholder="e.g. cover.jpg" {...register('imagePath')} />
+              <Controller
+                control={control}
+                name="imagePath"
+                render={({ field }) => (
+                  <AssetUploadField
+                    assetType="image"
+                    value={field.value}
+                    onChange={field.onChange}
+                    fieldName={field.name}
+                  />
+                )}
+              />
             </div>
           </div>
 
