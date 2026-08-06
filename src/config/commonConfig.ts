@@ -229,7 +229,7 @@ var common_config = {
       contentType: 'Sentence',
     },
   ],
-  readingComplexityLang : ['hi','te','kn'],
+  readingComplexityLang : ['hi','te','kn','ne'],
   tags: [
     'CEFR_M1_P1',
     'CEFR_M1_P2',
@@ -302,6 +302,19 @@ var common_config = {
     'M8_KN_READ',
     'M9_KN_READ',
     'M9_KN_TBImage',
+    'M4_NE_MECH',
+    'M5_NE_MECH',
+    'M6_NE_MECH',
+    'M7_NE_MECH',
+    'M8_NE_MECH',
+    'M9_NE_MECH',
+    'M4_NE_READ',
+    'M5_NE_READ',
+    'M6_NE_READ',
+    'M7_NE_READ',
+    'M8_NE_READ',
+    'M9_NE_READ',
+    'M9_NE_TBImage',
   ]
 };
 

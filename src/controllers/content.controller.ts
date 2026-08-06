@@ -161,7 +161,7 @@ export class contentController {
       if (!Array.isArray(content?.contentSourceData)) {
         throw new ValidationException('contentSourceData must be an array.');
       }
-      const lcSupportedLanguages = ['ta', 'ka', 'hi', 'te', 'kn'];
+      const lcSupportedLanguages = ['ta', 'ka', 'hi', 'te', 'kn', 'ne'];
 
       const updatedcontentSourceData = await Promise.all(
         content.contentSourceData.map(async (contentSourceDataEle) => {
@@ -1486,7 +1486,7 @@ export class contentController {
       if (!Array.isArray(content?.contentSourceData)) {
         throw new ValidationException('contentSourceData must be an array.');
       }
-      const lcSupportedLanguages = ['ta', 'ka', 'hi', 'te', 'kn'];
+      const lcSupportedLanguages = ['ta', 'ka', 'hi', 'te', 'kn', 'ne'];
 
       const updatedcontentSourceData = await Promise.all(
         content.contentSourceData.map(async (contentSourceDataEle) => {

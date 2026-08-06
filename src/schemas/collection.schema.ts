@@ -1,7 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, now } from 'mongoose';
 import { v4 as uuidv4 } from 'uuid';
-import { IsObject, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsObject, IsOptional, IsString } from 'class-validator';
 
 @Schema({ collection: 'collection' })
 export class collection {
@@ -93,8 +93,10 @@ export class collection {
     CEFR_level?: string;
   };
 
-  @Prop({ required: true })
-  tags: [string];
+  @Prop({ type: [String], required: true })
+  @IsArray()
+  @IsString({ each: true })
+  tags: string[];
 
   @Prop({ default: now(), index: true })
   createdAt: Date;
