@@ -1,0 +1,67 @@
+# Verifies that docs/generated/ still matches the source, that every path and symbol cited in
+# CLAUDE.md and docs/ exists, and that the backend and frontend language lists agree.
+#
+# Rationale: docs/superpowers/specs/2026-09-01-context-architecture-design.md
+# Three documents once gave three different answers for SUPPORTED_LANGUAGES and none matched the
+# code. This turns that class of drift into a failing build instead of silent rot.
+#
+# Deliberately separate from the deployment workflows in this directory — it must never gate a deploy.
+name: context-check
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  context-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Verify generated docs match source
+        working-directory: backend
+        run: npm run context:check
+
+  # Runs the backend Jest suite. Pull requests only — see the `if` below.
+  #
+  # Why PR-only: this repo has 8+ contributors and the deployment workflows already fire on
+  # every push. A test job on every push would go red on half-finished work-in-progress, which
+  # is the fastest way to train people to ignore red builds. Pull requests are where review
+  # happens and where a failing test is actually actionable.
+  #
+  # Added 2026-09-02, when the suite was green at 145/145 — a gate is only worth adding while
+  # it passes. Context: docs/invariants.md §4.9.
+  #
+  # Note: green here means "the tested parts still work", NOT "the code is safe" —
+  # bulk-processor, bulk-ingest, single-content-asset and asset-pipeline (~4,300 lines) have
+  # no specs at all. See CLAUDE.md §3.
+  test:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Run backend tests
+        working-directory: backend
+        run: npm run test

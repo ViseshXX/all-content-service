@@ -38,71 +38,35 @@ There are exactly **four supported content types**, set via the `contentType` fi
 
 ### Supported Languages
 
-| Code | Language |
-|---|---|
-| `en` | English |
-| `hi` | Hindi |
-| `ta` | Tamil |
-| `te` | Telugu |
-| `kn` | Kannada |
-| `gu` | Gujarati |
+> **Generated.** The authoritative list is `SUPPORTED_LANGUAGES` in
+> `backend/src/services/bulk-ingest.service.ts`, mirrored by `Language` in
+> `frontend/src/types/index.ts`. Both are reproduced, and checked against each other, in
+> [`generated/contracts.md`](generated/contracts.md).
+>
+> The table that used to sit here listed the wrong set. Do not re-add it.
 
-Languages `ta`, `hi`, `te`, `kn` (and `ka` as alias for Kannada) receive full complexity analysis via the language-complexity API. English receives phoneme extraction. Gujarati and others pass through without enrichment.
+Enrichment differs by language: `ta`, `hi`, `te`, `kn` receive full complexity analysis via the
+language-complexity API; English receives phoneme extraction; other supported languages pass
+through without enrichment. See the pipeline diagram below.
+
+Note that a language present in `SUPPORTED_LANGUAGES` but absent from `M1M2_SCRIPT_REGEXES`
+receives **no script validation at all** — see [`../docs/invariants.md`](invariants.md) §2.2.
 
 ---
 
 ## Data Schemas
 
-### Collection Schema
+> **Generated.** Field lists for every Mongoose schema — `content`, `collection`,
+> `multilingual`, `BulkUploadJob`, `CmsUser`, `AuditLog` — are in
+> [`generated/contracts.md`](generated/contracts.md), extracted from
+> `backend/src/schemas/*.schema.ts`.
+>
+> Hand-maintained copies of those tables previously drifted from the schemas, so they were
+> removed rather than corrected. Read the generated file, or the schema itself.
 
-Defined in `src/schemas/collection.schema.ts`.
+What follows is the part the schema cannot express: what the fields *mean*, and which are
+computed rather than supplied.
 
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `collectionId` | UUID (string) | auto | Auto-generated unique identifier |
-| `name` | string | yes | Human-readable name of the collection |
-| `category` | string | yes | Content type category: `Word`, `Sentence`, `Paragraph`, `Char` |
-| `language` | string | yes | Primary language code (`en`, `hi`, `ta`, etc.) |
-| `status` | string | yes | `live` or `draft` |
-| `description` | string | no | Optional description |
-| `author` | string | no | Author/creator name |
-| `publisher` | string | no | Publisher name |
-| `edition` | string | no | Edition identifier |
-| `imagePath` | string | no | Path to cover image |
-| `difficultyLevel` | string | no | Difficulty classification |
-| `ageGroup` | string | no | Target age group |
-| `level_complexity` | object | no | `{ level, level_competency, CEFR_level? }` |
-| `tags` | string[] | yes | Categorization tags (e.g., `ASER`, `set1`, `CEFR_M1_P1`) |
-| `reviewer` | string | no | Reviewer ID |
-| `reviewStatus` | string | no | Review state |
-| `flaggedBy` / `flagReasons` / `lastFlaggedOn` | string | no | Content moderation fields |
-| `createdAt` / `updatedAt` | Date | auto | Timestamps |
-
----
-
-### Content Schema
-
-Defined in `src/schemas/content.schema.ts`.
-
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `contentId` | UUID (string) | auto | Auto-generated unique identifier |
-| `collectionId` | string | no | UUID of the parent collection |
-| `name` | string | yes | Name/label for the content item |
-| `contentType` | string | yes | `Word`, `Sentence`, `Paragraph`, or `Char` |
-| `language` | string | yes | Primary language code |
-| `status` | string | yes | `live` or `draft` |
-| `contentSourceData` | Mixed[] | yes | Array of per-language content objects (see below) |
-| `mechanics_data` | object[] | no | Structured exercise data for specific mechanics (see below) |
-| `multilingual` | object | no | `{ [langCode]: { text, audio_url } }` — cross-language text/audio |
-| `level_complexity` | object | no | `{ level, level_competency, CEFR_level? }` |
-| `tags` | string[] | yes | Categorization tags |
-| `imagePath` | string | no | Path to associated image |
-| `contentIndex` | number | no | Ordering index within a collection |
-| `publisher` | string | no | Publisher name |
-| `reviewer` / `reviewStatus` | string | no | Review metadata |
-| `flaggedBy` / `flagReasons` / `lastFlaggedOn` | string | no | Moderation fields |
-| `createdAt` / `updatedAt` | Date | auto | Timestamps |
 
 #### `contentSourceData` — Per-Language Content Object
 
@@ -198,102 +162,18 @@ Tags are the primary mechanism for associating content with curriculum modules, 
 
 ## API Reference
 
-**Base path:** `/v1`
-**Auth:** All endpoints (except `/v1/ping`) require `Authorization: Bearer <JWT>`.
+> **Generated.** Every route — method, path, controller, handler and role requirement — is in
+> [`generated/api-surface.md`](generated/api-surface.md), extracted from the controller
+> decorators. Swagger UI at `/api` carries request and response schemas when the app is running.
+>
+> This section previously listed 17 routes by hand while the code had 50. The tables were
+> removed rather than corrected: a hand-maintained route list drifts the moment a controller
+> changes.
 
-### Collections
+Base path is `/v1`. All endpoints except `/v1/ping` require `Authorization: Bearer <JWT>`.
+Example request and response bodies are in the payload templates further down — those are
+genuinely useful and not derivable from the code.
 
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/v1/collection` | Create a collection |
-| `GET` | `/v1/collection` | List all collections |
-| `GET` | `/v1/collection/bylanguage/:language` | Collections by language |
-| `GET` | `/v1/collection/:id` | Get one collection by MongoDB `_id` |
-| `PUT` | `/v1/collection/:id` | Update a collection |
-| `DELETE` | `/v1/collection/:id` | Delete a collection |
-
-**Create Collection — minimum request body:**
-```json
-{
-  "name": "Grade 2 English Chapter 3",
-  "category": "Sentence",
-  "language": "en",
-  "status": "live",
-  "tags": ["CEFR_M1_P1"]
-}
-```
-
-### Content
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/v1/content` | Create content (with automatic linguistic enrichment) |
-| `GET` | `/v1/content` | List all content (paginated) |
-| `GET` | `/v1/content/pagination` | Paginated content with type/collection filter |
-| `GET` | `/v1/content/getByIds` | Fetch multiple items by content IDs |
-| `PUT` | `/v1/content/:id` | Update content (recomputes complexity) |
-| `DELETE` | `/v1/content/:id` | Delete content |
-| `POST` | `/v1/content/getContent` | Advanced filtered query (competency, mechanics, multilingual) |
-| `POST` | `/v1/content/getContentByFilters` | Filter by syllables, word count, complexity scores |
-| `POST` | `/v1/content/getAssessment` | Get assessment collections (ASER/NAS) |
-| `POST` | `/v1/content/getContentForMileStone` | Milestone content by level and complexity |
-| `GET` | `/v1/content/getRandomContent` | Random sample of content |
-| `GET` | `/v1/content/getContentWord` | Random words |
-| `GET` | `/v1/content/getContentSentence` | Random sentences |
-| `GET` | `/v1/content/getContentParagraph` | Random paragraphs |
-| `POST` | `/v1/content/multilingual` | Create multilingual translation data |
-
-**Create Content — minimum request body:**
-```json
-{
-  "collectionId": "3f0192af-0720-4248-b4d4-d99a9f731d4f",
-  "name": "gr2 eng ch3 s1",
-  "contentType": "Sentence",
-  "language": "en",
-  "status": "live",
-  "tags": ["CEFR_M1_P1"],
-  "contentSourceData": [
-    {
-      "language": "en",
-      "text": "Blue bird, blue bird, what do you see?"
-    }
-  ]
-}
-```
-
-**Create Content — example response** (service auto-computes enrichment):
-```json
-{
-  "status": "success",
-  "data": {
-    "contentId": "fa853c29-bf19-417a-9661-c67d2671ebc1",
-    "collectionId": "3f0192af-0720-4248-b4d4-d99a9f731d4f",
-    "contentType": "Sentence",
-    "language": "en",
-    "status": "live",
-    "tags": ["CEFR_M1_P1"],
-    "contentSourceData": [
-      {
-        "language": "en",
-        "text": "Blue bird, blue bird, what do you see?",
-        "phonemes": ["b", "l", "u", "b", "ə", "r", "d", "..."],
-        "wordCount": 8,
-        "wordFrequency": { "blue": 2, "bird": 2, "what": 1, "do": 1, "you": 1, "see": 1 },
-        "syllableCount": 28,
-        "syllableCountMap": { "blue": 4, "bird": 4, "what": 4, "do": 2, "you": 3, "see": 3 }
-      }
-    ]
-  }
-}
-```
-
-### Health Check
-
-| Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| `GET` | `/v1/ping` | None | Returns 200 if service is up |
-
----
 
 ## Content Processing Pipeline (on Create/Update)
 

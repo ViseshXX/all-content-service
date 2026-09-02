@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getModelToken } from '@nestjs/mongoose';
 import { contentService } from './content.service';
 import { content } from 'src/schemas/content.schema';
+import { multilingual } from 'src/schemas/multilingual.schema';
 import { HttpService } from '@nestjs/axios';
 
 describe('contentService', () => {
@@ -150,6 +151,38 @@ describe('contentService', () => {
             findOne: jest.fn().mockReturnValue({
               exec: jest.fn().mockResolvedValue(null),
             }),
+          },
+        },
+        {
+          // contentService's 2nd constructor arg. Used by the multilingual CRUD methods
+          // (find / findOne / findById / findByIdAndUpdate / findByIdAndDelete /
+          // countDocuments), all of which are chained with .lean() or awaited directly.
+          provide: getModelToken(multilingual.name),
+          useValue: {
+            find: jest.fn().mockReturnValue({
+              sort: jest.fn().mockReturnValue({
+                skip: jest.fn().mockReturnValue({
+                  limit: jest.fn().mockReturnValue({
+                    lean: jest.fn().mockResolvedValue([]),
+                  }),
+                }),
+              }),
+              lean: jest.fn().mockResolvedValue([]),
+            }),
+            findOne: jest.fn().mockReturnValue({
+              lean: jest.fn().mockResolvedValue(null),
+            }),
+            findById: jest.fn().mockReturnValue({
+              lean: jest.fn().mockResolvedValue(null),
+            }),
+            findByIdAndUpdate: jest.fn().mockReturnValue({
+              lean: jest.fn().mockResolvedValue(null),
+            }),
+            findByIdAndDelete: jest.fn().mockReturnValue({
+              lean: jest.fn().mockResolvedValue(null),
+            }),
+            countDocuments: jest.fn().mockResolvedValue(0),
+            create: jest.fn(),
           },
         },
         {

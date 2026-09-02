@@ -4,10 +4,17 @@ import { CollectionService } from '../services/collection.service';
 import { FastifyReply } from 'fastify';
 import { HttpStatus } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/auth.guard';
+import { AuditLogService } from 'src/services/audit-log.service';
 
 describe('CollectionController', () => {
   let controller: CollectionController;
   let service: CollectionService;
+
+  const mockRequest: any = {
+    headers: { authorization: 'Bearer test-token' },
+    ip: '127.0.0.1',
+    user: { virtual_id: 1234567890, username: 'test-curator', role: 'curator' },
+  };
 
   const mockReply: Partial<FastifyReply> = {
     status: jest.fn().mockReturnThis(),
@@ -49,6 +56,16 @@ describe('CollectionController', () => {
       controllers: [CollectionController],
       providers: [
         {
+          // Controllers write an audit entry on every mutating action. `log` is fire-and-forget
+          // (returns void), `findAll`/`findByResource` back the audit-log endpoints.
+          provide: AuditLogService,
+          useValue: {
+            log: jest.fn(),
+            findAll: jest.fn().mockResolvedValue({ logs: [], total: 0 }),
+            findByResource: jest.fn().mockResolvedValue([]),
+          },
+        },
+        {
           provide: CollectionService,
           useValue: {
             create: jest.fn(),
@@ -80,7 +97,7 @@ describe('CollectionController', () => {
         .spyOn(service, 'create')
         .mockImplementation(() => Promise.resolve(baseCollectionData));
 
-      await controller.create(mockReply as FastifyReply, baseCollectionData);
+      await controller.create(mockRequest, mockReply as FastifyReply, baseCollectionData);
 
       expect(service.create).toHaveBeenCalledWith(baseCollectionData);
       expect(mockReply.status).toHaveBeenCalledWith(HttpStatus.CREATED);
@@ -94,7 +111,7 @@ describe('CollectionController', () => {
       const error = new Error('DB Insert Failed');
       jest.spyOn(service, 'create').mockRejectedValue(error);
 
-      await controller.create(mockReply as FastifyReply, baseCollectionData);
+      await controller.create(mockRequest, mockReply as FastifyReply, baseCollectionData);
 
       expect(mockReply.status).toHaveBeenCalledWith(
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -227,7 +244,7 @@ describe('CollectionController', () => {
     it('should update the collection and return updated result', async () => {
       jest.spyOn(service, 'update').mockResolvedValue(updatedCollection);
 
-      await controller.update(mockReply as FastifyReply, mockId, updatePayload);
+      await controller.update(mockRequest, mockReply as FastifyReply, mockId, updatePayload);
 
       expect(service.update).toHaveBeenCalledWith(mockId, updatePayload);
       expect(mockReply.status).toHaveBeenCalledWith(HttpStatus.OK);
@@ -249,7 +266,7 @@ describe('CollectionController', () => {
     it('should delete the collection and return confirmation', async () => {
       jest.spyOn(service, 'delete').mockResolvedValue(mockDeletedResponse);
 
-      await controller.delete(mockReply as FastifyReply, mockId);
+      await controller.delete(mockRequest, mockReply as FastifyReply, mockId);
 
       expect(service.delete).toHaveBeenCalledWith(mockId);
       expect(mockReply.status).toHaveBeenCalledWith(HttpStatus.OK);

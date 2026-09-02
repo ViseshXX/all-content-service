@@ -23,6 +23,7 @@ jest.spyOn(require('crypto'), 'createHash').mockReturnValue(mockCreateHash as an
 describe('JwtAuthGuard', () => {
   let guard: JwtAuthGuard;
   let jwtService: jest.Mocked<JwtService>;
+  let cmsUserModel: any;
 
   const mockRequest = {
     headers: {
@@ -48,8 +49,22 @@ describe('JwtAuthGuard', () => {
       verify: jest.fn(),
     } as any;
 
+    // Create mock cms_users model. JwtAuthGuard calls
+    // cmsUserModel.findOne({ virtualId, isActive: true }).lean() and rejects when it
+    // resolves falsy, so the default must be an active user for the happy-path tests.
+    cmsUserModel = {
+      findOne: jest.fn().mockReturnValue({
+        lean: jest.fn().mockResolvedValue({
+          virtualId: 1234567890,
+          username: 'test-curator',
+          role: 'curator',
+          isActive: true,
+        }),
+      }),
+    } as any;
+
     // Create guard instance directly
-    guard = new JwtAuthGuard(jwtService);
+    guard = new JwtAuthGuard(jwtService, cmsUserModel);
 
     // Reset all mocks
     jest.clearAllMocks();
@@ -91,7 +106,14 @@ describe('JwtAuthGuard', () => {
       const result = await guard.canActivate(mockContext);
 
       expect(result).toBe(true);
-      expect(mockRequest.user).toEqual(mockVerifiedToken.payload);
+      // request.user is the verified JWT payload enriched from the cms_users lookup: the
+      // guard attaches username and role so RolesGuard and audit logging can use them.
+      // See docs/decisions/0006-auth-in-content-service.md
+      expect(mockRequest.user).toEqual({
+        ...mockVerifiedToken.payload,
+        username: 'test-curator',
+        role: 'curator',
+      });
     });
 
     it('should throw UnauthorizedException when authorization header is missing', async () => {
@@ -289,7 +311,7 @@ describe('JwtAuthGuard', () => {
 
       const result = await guard['checkTokenStatus'](userId);
 
-      expect(result).toEqual({ token: null });
+      expect(result).toEqual({ token: null, serviceUnavailable: true });
     });
 
     it('should return null token when API response has no result', async () => {
@@ -331,7 +353,7 @@ describe('JwtAuthGuard', () => {
 
       const result = await guard['checkTokenStatus'](userId);
 
-      expect(result).toEqual({ token: null });
+      expect(result).toEqual({ token: null, serviceUnavailable: true });
     });
 
     it('should handle axios error without response data', async () => {
@@ -344,7 +366,7 @@ describe('JwtAuthGuard', () => {
 
       const result = await guard['checkTokenStatus'](userId);
 
-      expect(result).toEqual({ token: null });
+      expect(result).toEqual({ token: null, serviceUnavailable: true });
     });
   });
 
@@ -384,6 +406,13 @@ describe('JwtAuthGuard', () => {
           getRequest: jest.fn().mockReturnValue(requestWithOnlyBearer),
         }),
       } as unknown as ExecutionContext;
+
+      // Reject explicitly rather than relying on mock state from earlier tests: real
+      // jose throws on an empty token, and jest.clearAllMocks() clears calls but not
+      // implementations, so leaked success mocks would otherwise let this through.
+      // Before cmsUserModel was injected this test passed only because the guard
+      // crashed on an undefined model — it was green for the wrong reason.
+      mockJose.jwtDecrypt.mockRejectedValue(new Error('Invalid Compact JWE'));
 
       await expect(guard.canActivate(contextWithOnlyBearer)).rejects.toThrow(
         UnauthorizedException,

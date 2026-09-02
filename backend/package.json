@@ -18,7 +18,9 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "ingest": "npx ts-node -r tsconfig-paths/register src/scripts/bulk_ingest.ts"
+    "ingest": "npx ts-node -r tsconfig-paths/register src/scripts/bulk_ingest.ts",
+    "context:generate": "ts-node -r tsconfig-paths/register scripts/generate-context.ts",
+    "context:check": "ts-node -r tsconfig-paths/register scripts/generate-context.ts --check"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1007.0",

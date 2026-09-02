@@ -10,6 +10,9 @@ import { JwtAuthGuard } from '../auth/auth.guard';
 import { AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 import { content } from 'src/schemas/content.schema';
 import en_config from '../config/language/en';
+import { AuditLogService } from 'src/services/audit-log.service';
+import { SingleContentAssetService } from 'src/services/single-content-asset.service';
+import { AssetPipelineService } from 'src/services/asset-pipeline.service';
 
 
 // Mock the en_config module before imports
@@ -50,6 +53,10 @@ jest.mock('../services/content.service', () => ({
     readAll: jest.fn(),
     countAll: jest.fn(),
     readById: jest.fn(),
+    readByIds: jest.fn(),
+    // create() delegates linguistic enrichment to the service, so the mock must
+    // return the contentSourceData it is given rather than undefined.
+    enrichContentSourceData: jest.fn().mockImplementation((csd) => Promise.resolve(csd)),
     update: jest.fn(),
     delete: jest.fn(),
     charNotPresent: jest.fn(),
@@ -75,6 +82,12 @@ describe('contentController', () => {
   let httpService: HttpService;
   let collectionService: CollectionService;
 
+  const mockRequest: any = {
+    headers: { authorization: 'Bearer test-token' },
+    ip: '127.0.0.1',
+    user: { virtual_id: 1234567890, username: 'test-curator', role: 'curator' },
+  };
+
   const mockReply: Partial<FastifyReply> = {
     status: jest.fn().mockReturnThis(),
     send: jest.fn(),
@@ -97,12 +110,42 @@ describe('contentController', () => {
             readAll: jest.fn(),
             countAll: jest.fn(),
             readById: jest.fn(),
+            readByIds: jest.fn(),
+            // create() delegates linguistic enrichment to the service, so the mock must
+            // return the contentSourceData it is given rather than undefined.
+            enrichContentSourceData: jest.fn().mockImplementation((csd) => Promise.resolve(csd)),
             update: jest.fn(),
             delete: jest.fn(),
             charNotPresent: jest.fn(),
             getMechanicsContentData: jest.fn(),
             getContentLevelData: jest.fn(),
             create: jest.fn(),
+          },
+        },
+        {
+          // Controllers write an audit entry on every mutating action. `log` is fire-and-forget
+          // (returns void), `findAll`/`findByResource` back the audit-log endpoints.
+          provide: AuditLogService,
+          useValue: {
+            log: jest.fn(),
+            findAll: jest.fn().mockResolvedValue({ logs: [], total: 0 }),
+            findByResource: jest.fn().mockResolvedValue([]),
+          },
+        },
+        {
+          provide: SingleContentAssetService,
+          useValue: {
+            createContentWithAssets: jest.fn().mockResolvedValue({}),
+          },
+        },
+        {
+          provide: AssetPipelineService,
+          useValue: {
+            checkAssetExists: jest.fn().mockResolvedValue(false),
+            convertAndUploadAudio: jest.fn().mockResolvedValue(''),
+            processImageBuffer: jest.fn().mockResolvedValue(Buffer.from('')),
+            synthesizeAndUploadTTS: jest.fn().mockResolvedValue(Buffer.from('')),
+            uploadToS3: jest.fn().mockResolvedValue(''),
           },
         },
         {
@@ -230,9 +273,9 @@ describe('contentController', () => {
       jest.spyOn(httpService, 'post').mockReturnValue(of(mockAxiosResponse));
       jest.spyOn(service, 'create').mockResolvedValue(mockContent);
 
-      await controller.create(mockReply as FastifyReply, reqBody);
+      await controller.create(mockRequest, mockReply as FastifyReply, reqBody);
 
-      expect(httpService.post).toHaveBeenCalled();
+      expect(service.enrichContentSourceData).toHaveBeenCalled();
       expect(service.create).toHaveBeenCalledWith(
         expect.objectContaining(reqBody),
       );
@@ -251,7 +294,7 @@ describe('contentController', () => {
         ],
       };
       jest.spyOn(service, 'create').mockResolvedValue(mockContent);
-      await controller.create(mockReply as FastifyReply, reqBodyOtherLang);
+      await controller.create(mockRequest, mockReply as FastifyReply, reqBodyOtherLang);
       expect(service.create).toHaveBeenCalledWith(
         expect.objectContaining(reqBodyOtherLang),
       );
@@ -282,8 +325,8 @@ describe('contentController', () => {
       };
       jest.spyOn(httpService, 'post').mockReturnValue(of(mockAxiosResponseKn));
       jest.spyOn(service, 'create').mockResolvedValue(mockContent);
-      await controller.create(mockReply as FastifyReply, reqBodyKn);
-      expect(httpService.post).toHaveBeenCalled();
+      await controller.create(mockRequest, mockReply as FastifyReply, reqBodyKn);
+      expect(service.enrichContentSourceData).toHaveBeenCalled();
       expect(service.create).toHaveBeenCalled();
       expect(mockReply.status).toHaveBeenCalledWith(HttpStatus.CREATED);
       expect(mockReply.send).toHaveBeenCalledWith({
@@ -292,21 +335,25 @@ describe('contentController', () => {
       });
     });
 
-    it('should handle server errors gracefully', async () => {
-      jest
-        .spyOn(httpService, 'post')
-        .mockReturnValue(throwError(() => new Error('API down')));
+      // Rewritten: this test simulated failure through httpService.post, but the controller
+      // no longer calls HTTP directly — enrichment moved into contentService. The catch block
+      // also sends the raw error.message rather than wrapping it in a generic 'Server error'
+      // string, so the assertion now matches what the code actually returns.
+      it('should handle server errors gracefully', async () => {
+        jest
+          .spyOn(service, 'create')
+          .mockRejectedValue(new Error('Database write failed'));
 
-      await controller.create(mockReply as FastifyReply, reqBody);
+        await controller.create(mockRequest, mockReply as FastifyReply, reqBody);
 
-      expect(mockReply.status).toHaveBeenCalledWith(
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-      expect(mockReply.send).toHaveBeenCalledWith({
-        status: 'error',
-        message: expect.stringContaining('Server error'),
+        expect(mockReply.status).toHaveBeenCalledWith(
+          HttpStatus.INTERNAL_SERVER_ERROR,
+        );
+        expect(mockReply.send).toHaveBeenCalledWith({
+          status: 'error',
+          message: 'Database write failed',
+        });
       });
-    });
   });
 
   // ---------- Test: POST /content/search ----------
@@ -679,11 +726,9 @@ describe('contentController', () => {
         .spyOn(service, 'getContentWord')
         .mockResolvedValue({ data: mockData, status: 200 });
 
-      await controller.getContentWord(mockReply as FastifyReply, 'en', {
-        limit: 5,
-      });
+      await controller.getContentWord(mockReply as FastifyReply, 'en', 5, 'false');
 
-      expect(service.getContentWord).toHaveBeenCalledWith(5, 'en');
+      expect(service.getContentWord).toHaveBeenCalledWith(5, 'en', false);
       expect(mockReply.status).toHaveBeenCalledWith(HttpStatus.OK);
       expect(mockReply.send).toHaveBeenCalledWith({
         status: 'success',
@@ -695,11 +740,9 @@ describe('contentController', () => {
       const error = new Error('DB error');
       jest.spyOn(service, 'getContentWord').mockRejectedValue(error);
 
-      await controller.getContentWord(mockReply as FastifyReply, 'en', {
-        limit: 5,
-      });
+      await controller.getContentWord(mockReply as FastifyReply, 'en', 5, 'false');
 
-      expect(service.getContentWord).toHaveBeenCalledWith(5, 'en');
+      expect(service.getContentWord).toHaveBeenCalledWith(5, 'en', false);
       expect(mockReply.status).toHaveBeenCalledWith(
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
@@ -1377,93 +1420,45 @@ describe('contentController', () => {
     });
   });
 
-  describe('findById', () => {
-    const mockContent = {
-      _id: '65e855cc75372f314360a601',
-      contentId: 'a76b39f4-d9be-409e-85a1-33293582919e',
-      collectionId: 'e0bdd73c-dd8b-4c2b-92cf-be753fd32c46',
-      name: 'शब्द-4',
-      contentType: 'Word',
-      contentSourceData: [
-        {
-          language: 'hi',
-          audioUrl: '',
-          text: 'तेल',
-          wordCount: 1,
-          syllableCount: 2,
-          meanOrthoComplexity: 0.2,
-          totalOrthoComplexity: 0.4,
-          meanPhonicComplexity: 4.95,
-          totalPhonicComplexity: 9.9,
-          meanComplexity: 10.3,
-          wordMeasures: [
-            {
-              text: 'तेल',
-              orthographic_complexity: 0.4,
-              phonologic_complexity: 9.9,
-            },
-          ],
-          wordFrequency: {
-            तेल: 1,
-          },
-          syllableCountMap: {
-            तेल: 2,
-          },
-          readingComplexity: 2.1,
-        },
-      ],
-      imagePath: '',
-      mechanics_data: [],
-      level_complexity: {
-        level: '',
-        level_competency: '',
-      },
-      flaggedBy: '',
-      lastFlaggedOn: '',
-      flagReasons: '',
-      reviewer: '',
-      reviewStatus: '',
-      status: 'live',
-      publisher: 'ekstep',
-      language: 'hi',
-      contentIndex: 1,
-      tags: [],
-      createdAt: new Date('2024-02-29T12:55:30.791Z'),
-      updatedAt: new Date('2024-02-29T12:55:30.791Z'),
-    };
+  // The old `findById` endpoint no longer exists: it was replaced by `findByIds`
+  // (GET /getByIds?ids=a,b,c), which splits a comma-separated list, calls
+  // contentService.readByIds, and responds { contents, count }. The previous tests targeted
+  // the removed method and its single-content response shape, so they were rewritten rather
+  // than patched.
+  describe('findByIds', () => {
+    it('should return contents for a comma-separated id list', async () => {
+      const mockContents = [
+        { contentId: 'uuid-1234', contentType: 'Word' },
+        { contentId: 'uuid-5678', contentType: 'Word' },
+      ];
+      jest.spyOn(service, 'readByIds').mockResolvedValue(mockContents as any);
 
-    it('should return content by ID', async () => {
-      jest.spyOn(service, 'readById').mockResolvedValue(mockContent as any);
+      await controller.findByIds(mockReply as FastifyReply, 'uuid-1234,uuid-5678');
 
-      await controller.findById(mockReply as FastifyReply, 'uuid-1234');
-
-      expect(service.readById).toHaveBeenCalledWith('uuid-1234');
+      expect(service.readByIds).toHaveBeenCalledWith(['uuid-1234', 'uuid-5678']);
       expect(mockReply.status).toHaveBeenCalledWith(HttpStatus.OK);
       expect(mockReply.send).toHaveBeenCalledWith({
-        content: mockContent,
+        contents: mockContents,
+        count: 2,
       });
     });
 
-    it('should handle error if service throws', async () => {
-      jest.spyOn(service, 'readById').mockRejectedValue(new Error('Not found'));
-      // Patch controller to handle error for this test
-      controller.findById = async (response, id) => {
-        try {
-          const content = await service.readById(id);
-          return response.status(HttpStatus.OK).send({ content });
-        } catch (error) {
-          return response.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
-            status: 'error',
-            message: 'Server error - ' + error,
-          });
-        }
-      };
-      await controller.findById(mockReply as FastifyReply, 'uuid-1234');
-      expect(mockReply.status).toHaveBeenCalledWith(HttpStatus.INTERNAL_SERVER_ERROR);
-      expect(mockReply.send).toHaveBeenCalledWith({
-        status: 'error',
-        message: expect.stringContaining('Server error'),
-      });
+    it('should trim whitespace around ids', async () => {
+      jest.spyOn(service, 'readByIds').mockResolvedValue([] as any);
+
+      await controller.findByIds(mockReply as FastifyReply, ' uuid-1234 , uuid-5678 ');
+
+      expect(service.readByIds).toHaveBeenCalledWith(['uuid-1234', 'uuid-5678']);
+    });
+
+    it('should handle a single id', async () => {
+      const mockContents = [{ contentId: 'uuid-1234' }];
+      jest.spyOn(service, 'readByIds').mockResolvedValue(mockContents as any);
+
+      await controller.findByIds(mockReply as FastifyReply, 'uuid-1234');
+
+      expect(service.readByIds).toHaveBeenCalledWith(['uuid-1234']);
+      expect(mockReply.send).toHaveBeenCalledWith({ contents: mockContents, count: 1 });
     });
   });
 
@@ -1532,7 +1527,7 @@ describe('contentController', () => {
         .spyOn(httpService, 'post')
         .mockReturnValue(of(mockAxiosResponse as AxiosResponse));
 
-      await controller.update(mockReply as any, contentId, mockContentInput);
+      await controller.update(mockRequest, mockReply as any, contentId, mockContentInput);
 
       expect(service.update).toHaveBeenCalled();
       expect(mockReply.status).toHaveBeenCalledWith(200);
@@ -1546,7 +1541,7 @@ describe('contentController', () => {
       const error = 'TypeError: Cannot read properties of undefined (reading \'pipe\')';
       jest.spyOn(service, 'update').mockRejectedValue(error);
 
-      await controller.update(mockReply as any, contentId, mockContentInput);
+      await controller.update(mockRequest, mockReply as any, contentId, mockContentInput);
 
       expect(mockReply.status).toHaveBeenCalledWith(500);
       expect(mockReply.send).toHaveBeenCalledWith({
@@ -1563,7 +1558,7 @@ describe('contentController', () => {
     it('should delete content by id successfully', async () => {
       jest.spyOn(service, 'delete').mockResolvedValue(mockDeletedResult);
 
-      await controller.delete(mockReply as any, contentId);
+      await controller.delete(mockRequest, mockReply as any, contentId);
 
       expect(service.delete).toHaveBeenCalledWith(contentId);
       expect(mockReply.status).toHaveBeenCalledWith(200);
@@ -1575,7 +1570,7 @@ describe('contentController', () => {
     it('should handle error if service throws', async () => {
       jest.spyOn(service, 'delete').mockRejectedValue(new Error('Delete failed'));
       // Patch controller to handle error for this test
-      controller.delete = async (response, id) => {
+      controller.delete = async (request, response, id) => {
         try {
           const deleted = await service.delete(id);
           return response.status(HttpStatus.OK).send({ deleted });
@@ -1586,7 +1581,7 @@ describe('contentController', () => {
           });
         }
       };
-      await controller.delete(mockReply as any, contentId);
+      await controller.delete(mockRequest, mockReply as any, contentId);
       expect(mockReply.status).toHaveBeenCalledWith(HttpStatus.INTERNAL_SERVER_ERROR);
       expect(mockReply.send).toHaveBeenCalledWith({
         status: 'error',

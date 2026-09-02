@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/on-contract-change.sh\"",
+            "timeout": 60,
+            "statusMessage": "Checking generated docs"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/session-context-status.sh\"",
+            "timeout": 60,
+            "statusMessage": "Verifying docs match source"
+          }
+        ]
+      }
+    ]
+  }
+}
