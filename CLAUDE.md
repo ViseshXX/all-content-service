@@ -158,6 +158,13 @@ This repo has a measured history of confidently-wrong documentation. Current sta
 `docs/decisions/`. `FRONTEND_BULK_UPLOAD_ARCHITECTURE.md` — described shipped features as "Does not exist".
 `docs/context.md` — 0 bytes.
 
+**Extending the generator.** New **schemas** and **controllers** are picked up automatically — they are
+discovered by directory scan, so a new schema field or route appears in `docs/generated/` with no config
+change. A new **service constant or type** you want documented is not: add it to the `CONTRACTS` list in
+`backend/scripts/generate-context.ts`, and add the file's path to the `case` statement in
+`.claude/hooks/on-contract-change.sh` so edits to it still trigger regeneration. Those two lists must
+agree; the hook carries a comment saying so.
+
 **Before quoting an API route, type or constant, run `cd backend && npm run context:check`.** It
 regenerates `docs/generated/` from source, verifies every path and symbol cited in the docs still
 exists, and confirms the backend/frontend language lists still agree. Exit 0 means the docs can be
